@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>הרשמה מראש לאירוע</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: var(--card);
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid #334155;
+    }
+    .header h1 { font-size: 1.3rem; }
+    .header p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+
+    .screen { display: none; flex: 1; flex-direction: column; padding: 24px; }
+    .screen.active { display: flex; }
+
+    /* Register form */
+    .register-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+    .reg-icon { font-size: 3.5rem; text-align: center; }
+    .reg-text { text-align: center; color: var(--muted); line-height: 1.6; font-size: 1rem; }
+
+    .form-group {
+      width: 100%;
+      max-width: 400px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .form-group .optional {
+      font-weight: 400;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 14px 18px;
+      background: var(--card);
+      border: 2px solid #475569;
+      border-radius: 14px;
+      color: var(--text);
+      font-size: 1.05rem;
+      text-align: right;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { border-color: #60a5fa; }
+
+    /* Slot picker */
+    .slot-picker {
+      width: 100%;
+      max-width: 400px;
+    }
+    .slot-picker label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .slot-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slot-option {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+      border: 2px solid #334155;
+      border-radius: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .slot-option:hover { border-color: #475569; }
+    .slot-option.selected { border-color: var(--blue); background: rgba(59,130,246,0.08); }
+    .slot-option.full { opacity: 0.4; cursor: not-allowed; border-color: #334155; }
+    .slot-option .slot-time {
+      font-weight: 600;
+      font-size: 1rem;
+      direction: ltr;
+    }
+    .slot-option .slot-info {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: left;
+      direction: ltr;
+    }
+    .slot-option .slot-avail {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 8px;
+    }
+    .slot-avail.avail-ok { background: rgba(34,197,94,0.12); color: var(--green); }
+    .slot-avail.avail-low { background: rgba(234,179,8,0.12); color: #eab308; }
+    .slot-avail.avail-full { background: rgba(239,68,68,0.12); color: var(--red); }
+
+    .success-slot {
+      background: rgba(59,130,246,0.1);
+      color: var(--blue);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      direction: ltr;
+    }
+
+    .btn-register {
+      width: 100%;
+      max-width: 400px;
+      padding: 18px;
+      background: linear-gradient(135deg, var(--blue), #2563eb);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-register:active { transform: scale(0.97); }
+    .btn-register:disabled { opacity: 0.4; }
+
+    .error-msg {
+      background: rgba(239,68,68,0.15);
+      color: var(--red);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      text-align: center;
+      width: 100%;
+      max-width: 400px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    /* Success screen */
+    .success-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .success-icon { font-size: 4rem; }
+    .success-title { font-size: 1.3rem; font-weight: 700; }
+    .success-name { font-size: 1.1rem; color: var(--muted); }
+
+    .code-box {
+      background: var(--card);
+      border: 2px dashed #475569;
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin: 8px 0;
+      width: 100%;
+      max-width: 350px;
+    }
+    .code-label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .code-value {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: 4px;
+      color: var(--blue);
+      direction: ltr;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .code-instructions {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      max-width: 350px;
+    }
+
+    .link-box {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 14px 18px;
+      width: 100%;
+      max-width: 350px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+    }
+    .link-url {
+      font-size: 0.8rem;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      direction: ltr;
+      flex: 1;
+    }
+    .btn-copy {
+      background: rgba(59,130,246,0.15);
+      color: var(--blue);
+      border: 1px solid rgba(59,130,246,0.3);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .btn-goto {
+      width: 100%;
+      max-width: 350px;
+      padding: 16px;
+      background: linear-gradient(135deg, var(--green), #16a34a);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      text-decoration: none;
+      text-align: center;
+      display: block;
+    }
+
+    /* Full screen */
+    .full-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .full-icon { font-size: 4rem; }
+    .full-text { font-size: 1.2rem; color: var(--red); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>הרשמה מראש לאירוע</h1>
+    <p>הבטיחו את מקומכם מראש</p>
+  </div>
+
+  <!-- Registration form -->
+  <div class="screen register-screen active" id="screenRegister">
+    <div class="reg-icon">📋</div>
+    <div class="reg-text">הירשמו מראש כדי להבטיח כניסה ישירה לאירוע</div>
+    <div class="form-group">
+      <label>שם מלא</label>
+      <input type="text" id="nameInput" placeholder="הכניסו את שמכם" autocomplete="name" />
+    </div>
+    <div class="form-group">
+      <label>טלפון <span class="optional">(אופציונלי)</span></label>
+      <input type="tel" id="phoneInput" placeholder="050-1234567" autocomplete="tel" />
+    </div>
+    <div class="slot-picker">
+      <label>בחרו חלון זמן</label>
+      <div class="slot-grid" id="slotGrid">
+        <div style="text-align: center; color: var(--muted); padding: 12px;">טוען...</div>
+      </div>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+    <button class="btn-register" id="btnRegister" onclick="doRegister()">הרשמה</button>
+  </div>
+
+  <!-- Success -->
+  <div class="screen success-screen" id="screenSuccess">
+    <div class="success-icon">🎉</div>
+    <div class="success-title">נרשמתם בהצלחה!</div>
+    <div class="success-name" id="successName"></div>
+    <div class="success-slot" id="successSlot"></div>
+
+    <div class="code-box">
+      <div class="code-label">קוד הכניסה שלכם</div>
+      <div class="code-value" id="codeDisplay"></div>
+    </div>
+
+    <div class="code-instructions">
+      שמרו את הקוד הזה! ביום האירוע, היכנסו לקישור הכניסה והזינו את הקוד כדי להיכנס ישירות.
+    </div>
+
+    <div class="link-box">
+      <span class="link-url" id="checkinLink"></span>
+      <button class="btn-copy" onclick="copyLink()">העתק</button>
+    </div>
+
+    <a class="btn-goto" id="gotoCheckin" href="/">כניסה לאירוע עכשיו</a>
+  </div>
+
+  <!-- Full -->
+  <div class="screen full-screen" id="screenFull">
+    <div class="full-icon">😔</div>
+    <div class="full-text">ההרשמה מלאה</div>
+    <div style="color: var(--muted); font-size: 0.95rem;">כל המקומות לאירוע נתפסו</div>
+  </div>
+
+  <!-- Not configured -->
+  <div class="screen full-screen" id="screenNotConfigured">
+    <div class="full-icon">🔧</div>
+    <div class="full-text" style="color: var(--muted);">האירוע טרם הוגדר</div>
+    <div style="color: var(--muted); font-size: 0.9rem;">ההרשמה תיפתח בקרוב</div>
+  </div>
+
+  <script>
+    let selectedSlot = -1;
+    let slotsData = [];
+    let maxCapacity = 50;
+
+    // Load slots on page load
+    loadSlots();
+
+    async function loadSlots() {
+      try {
+        const res = await fetch('/api/slots');
+        const data = await res.json();
+        if (data.configured === false) {
+          showScreen('screenNotConfigured');
+          return;
+        }
+        slotsData = data.slots || [];
+        if (data.maxCapacity) maxCapacity = data.maxCapacity;
+        renderSlots();
+      } catch {
+        document.getElementById('slotGrid').innerHTML =
+          '<div style="text-align: center; color: var(--red); padding: 12px;">שגיאה בטעינת חלונות זמן</div>';
+      }
+    }
+
+    function renderSlots() {
+      const grid = document.getElementById('slotGrid');
+      if (slotsData.length === 0) {
+        grid.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 12px;">אין חלונות זמן זמינים</div>';
+        return;
+      }
+
+      grid.innerHTML = slotsData.map(slot => {
+        const isFull = slot.full;
+        const pct = slot.registered / maxCapacity;
+        let availClass = 'avail-ok';
+        let availText = `${slot.available} מקומות`;
+        if (isFull) { availClass = 'avail-full'; availText = 'מלא'; }
+        else if (pct >= 0.8) { availClass = 'avail-low'; availText = `${slot.available} אחרונים`; }
+
+        return `
+          <div class="slot-option ${isFull ? 'full' : ''} ${selectedSlot === slot.index ? 'selected' : ''}"
+               onclick="${isFull ? '' : `selectSlot(${slot.index})`}">
+            <div>
+              <div class="slot-time">${slot.label}</div>
+              <div class="slot-info">סבב ${slot.index + 1}</div>
+            </div>
+            <span class="slot-avail ${availClass}">${availText}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectSlot(index) {
+      selectedSlot = index;
+      renderSlots();
+    }
+
+    async function doRegister() {
+      const name = document.getElementById('nameInput').value.trim();
+      const phone = document.getElementById('phoneInput').value.trim();
+
+      if (!name) { showError('נא להזין שם'); return; }
+      if (selectedSlot < 0) { showError('נא לבחור חלון זמן'); return; }
+
+      const btn = document.getElementById('btnRegister');
+      btn.disabled = true;
+      btn.textContent = 'נרשם...';
+
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone, slotIndex: selectedSlot }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          if (res.status === 409) {
+            showError(data.error || 'חלון הזמן מלא');
+            loadSlots(); // Refresh slots
+          } else {
+            showError(data.error || 'שגיאה ברישום');
+          }
+          return;
+        }
+
+        document.getElementById('successName').textContent = data.name;
+        document.getElementById('successSlot').textContent = `סבב ${data.slotIndex + 1}: ${data.slotLabel}`;
+        document.getElementById('codeDisplay').textContent = data.code;
+
+        const baseUrl = window.location.origin;
+        const checkinUrl = `${baseUrl}/?code=${data.code}`;
+        document.getElementById('checkinLink').textContent = checkinUrl;
+        document.getElementById('gotoCheckin').href = `/?code=${data.code}`;
+
+        if (navigator.vibrate) navigator.vibrate(100);
+        showScreen('screenSuccess');
+      } catch {
+        showError('שגיאת תקשורת, נסו שוב');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'הרשמה';
+      }
+    }
+
+    function copyLink() {
+      const url = document.getElementById('checkinLink').textContent;
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.querySelector('.btn-copy');
+        btn.textContent = 'הועתק!';
+        setTimeout(() => btn.textContent = 'העתק', 2000);
+      });
+    }
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 4000);
+    }
+
+    document.getElementById('nameInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('phoneInput').focus(); }
+    });
+    document.getElementById('phoneInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); doRegister(); }
+    });
+  </script>
+</body>
+</html>

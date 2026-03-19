@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>כניסה לאירוע</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --orange: #f97316;
+      --red: #ef4444;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: var(--card);
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid #334155;
+    }
+    .header h1 { font-size: 1.3rem; }
+    .header p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+
+    .screen { display: none; flex: 1; flex-direction: column; padding: 24px; }
+    .screen.active { display: flex; }
+
+    /* Choice screen */
+    .choice-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+    .choice-icon { font-size: 3.5rem; text-align: center; }
+    .choice-text { text-align: center; color: var(--muted); line-height: 1.6; font-size: 1rem; max-width: 350px; }
+
+    .choice-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--card);
+      border: 2px solid #334155;
+      border-radius: 16px;
+      padding: 20px;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      text-align: center;
+    }
+    .choice-card:active { transform: scale(0.98); }
+    .choice-card:hover { border-color: #475569; }
+    .choice-card.highlight { border-color: var(--blue); background: rgba(59,130,246,0.05); }
+    .choice-card .card-icon { font-size: 2rem; margin-bottom: 8px; }
+    .choice-card .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .choice-card .card-desc { font-size: 0.85rem; color: var(--muted); }
+
+    .or-divider {
+      color: var(--muted);
+      font-size: 0.85rem;
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .or-divider::before, .or-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      height: 1px;
+      background: #334155;
+      width: 40%;
+    }
+    .or-divider::before { right: 0; }
+    .or-divider::after { left: 0; }
+
+    /* Code check-in screen */
+    .code-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+    .code-screen .back-link {
+      color: var(--muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    /* Walk-in screen */
+    .walkin-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+    .walkin-screen .back-link {
+      color: var(--muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .form-group {
+      width: 100%;
+      max-width: 400px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 16px 20px;
+      background: var(--card);
+      border: 2px solid #475569;
+      border-radius: 14px;
+      color: var(--text);
+      font-size: 1.1rem;
+      text-align: right;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input.code-input {
+      text-align: center;
+      direction: ltr;
+      letter-spacing: 4px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .form-group input:focus { border-color: #60a5fa; }
+
+    .btn-action {
+      width: 100%;
+      max-width: 400px;
+      padding: 20px;
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 1.3rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-action:active { transform: scale(0.97); }
+    .btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-action.green { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    .btn-action.blue { background: linear-gradient(135deg, var(--blue), #2563eb); }
+
+    .error-msg {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      text-align: center;
+      width: 100%;
+      max-width: 400px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    .prereg-badge {
+      display: inline-block;
+      background: rgba(59,130,246,0.15);
+      color: var(--blue);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .walkin-badge {
+      display: inline-block;
+      background: rgba(34,197,94,0.15);
+      color: var(--green);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* Active screen */
+    .active-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      text-align: center;
+    }
+    .active-check { font-size: 5rem; }
+    .active-name { font-size: 1.5rem; font-weight: 700; }
+    .active-status { font-size: 1rem; color: var(--green); font-weight: 600; }
+    .active-timer {
+      font-size: 2.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      direction: ltr;
+    }
+    .active-timer-label { font-size: 0.85rem; color: var(--muted); }
+    .btn-checkout {
+      width: 100%;
+      max-width: 400px;
+      padding: 20px;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 1.3rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-checkout:active { transform: scale(0.97); }
+
+    /* Done screen */
+    .done-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .done-icon { font-size: 4rem; }
+    .done-text { font-size: 1.2rem; font-weight: 600; }
+    .done-duration { font-size: 1rem; color: var(--muted); }
+    .btn-again {
+      padding: 14px 32px;
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid #475569;
+      border-radius: 12px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    /* Full screen */
+    .full-screen {
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .full-icon { font-size: 4rem; }
+    .full-text { font-size: 1.2rem; color: var(--red); font-weight: 600; }
+    .full-sub { color: var(--muted); font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>ברוכים הבאים לאירוע</h1>
+    <p>בחרו את אופן הכניסה</p>
+  </div>
+
+  <!-- Screen 1: Choice - pre-registered or walk-in -->
+  <div class="screen choice-screen active" id="screenChoice">
+    <div class="choice-icon">👋</div>
+    <div class="choice-text">איך תרצו להיכנס?</div>
+
+    <div class="choice-card highlight" onclick="showCodeScreen()">
+      <div class="card-icon">🎫</div>
+      <div class="card-title">נרשמתי מראש</div>
+      <div class="card-desc">יש לי קוד הרשמה - כניסה ישירה</div>
+    </div>
+
+    <div class="or-divider">או</div>
+
+    <div class="choice-card" onclick="showWalkinScreen()">
+      <div class="card-icon">🚶</div>
+      <div class="card-title">כניסה ללא הרשמה</div>
+      <div class="card-desc">בכפוף למקומות פנויים</div>
+    </div>
+  </div>
+
+  <!-- Screen 2a: Code check-in -->
+  <div class="screen code-screen" id="screenCode">
+    <div style="font-size: 3rem; text-align: center;">🎫</div>
+    <div style="text-align: center; font-size: 1.1rem; font-weight: 600;">הזינו את קוד ההרשמה</div>
+    <div class="form-group">
+      <input type="text" id="codeInput" class="code-input" placeholder="ABCD1234" autocomplete="off" maxlength="8" />
+    </div>
+    <div class="error-msg" id="codeError"></div>
+    <button class="btn-action blue" id="btnCodeCheckin" onclick="doCodeCheckin()">כניסה עם קוד</button>
+    <span class="back-link" onclick="showChoice()">חזרה</span>
+  </div>
+
+  <!-- Screen 2b: Walk-in check-in -->
+  <div class="screen walkin-screen" id="screenWalkin">
+    <div style="font-size: 3rem; text-align: center;">🚶</div>
+    <div style="text-align: center; font-size: 1.1rem; font-weight: 600;">כניסה ללא הרשמה מראש</div>
+    <div class="form-group">
+      <label>שם מלא</label>
+      <input type="text" id="nameInput" placeholder="הכניסו את שמכם" autocomplete="name" />
+    </div>
+    <div class="error-msg" id="walkinError"></div>
+    <button class="btn-action green" id="btnWalkin" onclick="doWalkinCheckin()">כניסה לאירוע</button>
+    <span class="back-link" onclick="showChoice()">חזרה</span>
+  </div>
+
+  <!-- Screen 3: Currently checked in -->
+  <div class="screen active-screen" id="screenActive">
+    <div class="active-check">✅</div>
+    <div class="active-name" id="activeName"></div>
+    <div id="activeBadge"></div>
+    <div class="active-status">נוכח/ת באירוע</div>
+    <div class="active-timer" id="activeTimer">00:00:00</div>
+    <div class="active-timer-label">זמן שהייה</div>
+    <button class="btn-checkout" onclick="doCheckout()">יציאה מהאירוע</button>
+  </div>
+
+  <!-- Screen 4: Done -->
+  <div class="screen done-screen" id="screenDone">
+    <div class="done-icon">👏</div>
+    <div class="done-text">תודה שהגעתם!</div>
+    <div class="done-duration" id="doneDuration"></div>
+    <button class="btn-again" onclick="showChoice()">כניסה מחדש</button>
+  </div>
+
+  <!-- Screen 5: Full -->
+  <div class="screen full-screen" id="screenFull">
+    <div class="full-icon">🚫</div>
+    <div class="full-text">האירוע מלא כרגע</div>
+    <div class="full-sub">נסו שוב בעוד מספר דקות</div>
+    <button class="btn-again" onclick="showChoice()" style="margin-top: 30px;">נסו שוב</button>
+  </div>
+
+  <!-- Screen 6: Not configured -->
+  <div class="screen full-screen" id="screenNotConfigured">
+    <div class="full-icon">🔧</div>
+    <div class="full-text" style="color: var(--muted);">האירוע טרם הוגדר</div>
+    <div class="full-sub">הכניסה תיפתח בקרוב</div>
+  </div>
+
+  <script>
+    let guestId = null;
+    let guestName = '';
+    let guestType = '';
+    let checkinTime = null;
+    let timerInterval = null;
+
+    // Restore session
+    const saved = localStorage.getItem('eventGateGuest');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        guestId = data.id;
+        guestName = data.name;
+        guestType = data.type || 'walkin';
+        checkinTime = data.checkinTime;
+        showActive();
+      } catch {}
+    }
+
+    // Check if event is configured
+    const urlCode = new URLSearchParams(window.location.search).get('code');
+    if (!guestId) {
+      fetch('/api/slots').then(r => r.json()).then(data => {
+        if (data.configured === false) {
+          showScreen('screenNotConfigured');
+        } else if (urlCode) {
+          showCodeScreen();
+          document.getElementById('codeInput').value = urlCode.toUpperCase();
+          setTimeout(() => doCodeCheckin(), 300);
+        }
+      }).catch(() => {});
+    }
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function showChoice() {
+      clearSession();
+      // Clean URL params
+      history.replaceState({}, '', '/');
+      showScreen('screenChoice');
+    }
+
+    function showCodeScreen() {
+      showScreen('screenCode');
+      document.getElementById('codeInput').value = urlCode ? urlCode.toUpperCase() : '';
+      document.getElementById('codeError').classList.remove('show');
+      document.getElementById('codeInput').focus();
+    }
+
+    function showWalkinScreen() {
+      showScreen('screenWalkin');
+      document.getElementById('nameInput').value = '';
+      document.getElementById('walkinError').classList.remove('show');
+      document.getElementById('nameInput').focus();
+    }
+
+    function showActive() {
+      document.getElementById('activeName').textContent = guestName;
+      const badgeEl = document.getElementById('activeBadge');
+      if (guestType === 'preregistered') {
+        badgeEl.innerHTML = '<span class="prereg-badge">נרשם/ה מראש</span>';
+      } else {
+        badgeEl.innerHTML = '<span class="walkin-badge">אורח/ת</span>';
+      }
+      showScreen('screenActive');
+      startTimer();
+    }
+
+    async function doCodeCheckin() {
+      const code = document.getElementById('codeInput').value.trim();
+      if (!code) {
+        showCodeError('נא להזין קוד');
+        return;
+      }
+
+      const btn = document.getElementById('btnCodeCheckin');
+      btn.disabled = true;
+      btn.textContent = 'נכנס...';
+
+      try {
+        const res = await fetch('/api/checkin/code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          if (res.status === 409) {
+            showScreen('screenFull');
+          } else {
+            showCodeError(data.error || 'שגיאה בכניסה');
+          }
+          return;
+        }
+
+        saveSession(data.id, data.name, 'preregistered');
+        if (navigator.vibrate) navigator.vibrate(100);
+        showActive();
+      } catch {
+        showCodeError('שגיאת תקשורת, נסו שוב');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'כניסה עם קוד';
+      }
+    }
+
+    async function doWalkinCheckin() {
+      const name = document.getElementById('nameInput').value.trim();
+      if (!name) {
+        showWalkinError('נא להזין שם');
+        return;
+      }
+
+      const btn = document.getElementById('btnWalkin');
+      btn.disabled = true;
+      btn.textContent = 'נכנס...';
+
+      try {
+        const res = await fetch('/api/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          if (res.status === 409) {
+            if (data.reservedFull) {
+              showWalkinError(data.error);
+            } else {
+              showScreen('screenFull');
+            }
+          } else {
+            showWalkinError(data.error || 'שגיאה בכניסה');
+          }
+          return;
+        }
+
+        saveSession(data.id, data.name, 'walkin');
+        if (navigator.vibrate) navigator.vibrate(100);
+        showActive();
+      } catch {
+        showWalkinError('שגיאת תקשורת, נסו שוב');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'כניסה לאירוע';
+      }
+    }
+
+    function saveSession(id, name, type) {
+      guestId = id;
+      guestName = name;
+      guestType = type;
+      checkinTime = Date.now();
+      localStorage.setItem('eventGateGuest', JSON.stringify({ id, name, type, checkinTime }));
+    }
+
+    async function doCheckout() {
+      if (!guestId) return;
+      try {
+        const res = await fetch(`/api/checkout/${guestId}`, { method: 'POST' });
+        const data = await res.json();
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+        const duration = data.duration || (Date.now() - checkinTime);
+        document.getElementById('doneDuration').textContent = `שהיתם באירוע ${formatDuration(duration)}`;
+        clearSession();
+        showScreen('screenDone');
+      } catch {
+        clearSession();
+        showScreen('screenDone');
+      }
+    }
+
+    function clearSession() {
+      guestId = null;
+      guestName = '';
+      guestType = '';
+      checkinTime = null;
+      localStorage.removeItem('eventGateGuest');
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      updateTimer();
+      timerInterval = setInterval(updateTimer, 1000);
+    }
+
+    function updateTimer() {
+      if (!checkinTime) return;
+      const elapsed = Date.now() - checkinTime;
+      document.getElementById('activeTimer').textContent = formatTime(elapsed);
+    }
+
+    function formatTime(ms) {
+      const s = Math.floor(ms / 1000) % 60;
+      const m = Math.floor(ms / 60000) % 60;
+      const h = Math.floor(ms / 3600000);
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function formatDuration(ms) {
+      const m = Math.floor(ms / 60000);
+      if (m < 60) return `${m} דקות`;
+      const h = Math.floor(m / 60);
+      return `${h} שעות ו-${m % 60} דקות`;
+    }
+
+    function showCodeError(msg) {
+      const el = document.getElementById('codeError');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 4000);
+    }
+
+    function showWalkinError(msg) {
+      const el = document.getElementById('walkinError');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 4000);
+    }
+
+    // Enter keys
+    document.getElementById('codeInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); doCodeCheckin(); }
+    });
+    document.getElementById('nameInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); doWalkinCheckin(); }
+    });
+    // Auto uppercase code input
+    document.getElementById('codeInput').addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+  </script>
+</body>
+</html>

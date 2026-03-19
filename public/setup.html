@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>הגדרת אירוע</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --orange: #f97316;
+      --red: #ef4444;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: var(--card);
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid #334155;
+    }
+    .header h1 { font-size: 1.3rem; }
+    .header p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+
+    .screen { display: none; flex: 1; flex-direction: column; padding: 24px; }
+    .screen.active { display: flex; }
+
+    /* Setup form */
+    .setup-screen {
+      align-items: center;
+      gap: 16px;
+    }
+    .setup-icon { font-size: 3rem; text-align: center; }
+
+    .form-group {
+      width: 100%;
+      max-width: 420px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .form-group .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--card);
+      border: 2px solid #475569;
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: #60a5fa; }
+    .form-group input[type="date"],
+    .form-group input[type="time"] {
+      color-scheme: dark;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .form-row .form-group { flex: 1; }
+
+    /* Preview */
+    .preview-box {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 16px;
+      display: none;
+    }
+    .preview-box.show { display: block; }
+    .preview-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .preview-slots {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .preview-slot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--bg);
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+    .preview-slot .ps-time { direction: ltr; font-weight: 600; }
+    .preview-slot .ps-label { color: var(--muted); font-size: 0.75rem; }
+    .preview-summary {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #334155;
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+    .preview-summary .total { color: var(--green); font-weight: 700; }
+
+    .btn-create {
+      width: 100%;
+      max-width: 420px;
+      padding: 18px;
+      background: linear-gradient(135deg, var(--green), #16a34a);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-create:active { transform: scale(0.97); }
+    .btn-create:disabled { opacity: 0.4; }
+
+    .error-msg {
+      background: rgba(239,68,68,0.15);
+      color: var(--red);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      text-align: center;
+      width: 100%;
+      max-width: 420px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    /* Success screen */
+    .success-screen {
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .success-icon { font-size: 4rem; }
+    .success-title { font-size: 1.3rem; font-weight: 700; }
+    .success-sub { color: var(--muted); font-size: 0.95rem; }
+
+    .links-box {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .link-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .link-row .link-label { font-size: 0.85rem; font-weight: 600; }
+    .link-row .link-url {
+      font-size: 0.75rem;
+      color: var(--muted);
+      direction: ltr;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .btn-copy-sm {
+      background: rgba(59,130,246,0.15);
+      color: var(--blue);
+      border: 1px solid rgba(59,130,246,0.3);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .btn-nav {
+      width: 100%;
+      max-width: 420px;
+      padding: 14px;
+      border: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      display: block;
+    }
+    .btn-nav.admin { background: linear-gradient(135deg, var(--blue), #2563eb); color: white; }
+    .btn-nav.reconfig {
+      background: var(--card);
+      color: var(--muted);
+      border: 1px solid #475569;
+      margin-top: 8px;
+    }
+
+    /* Already configured banner */
+    .config-banner {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(234,179,8,0.1);
+      border: 1px solid rgba(234,179,8,0.25);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 0.85rem;
+      color: #eab308;
+      text-align: center;
+      display: none;
+    }
+    .config-banner.show { display: block; }
+    .config-banner .cb-text { margin-bottom: 8px; }
+    .config-banner .cb-btn {
+      background: rgba(234,179,8,0.15);
+      border: 1px solid rgba(234,179,8,0.3);
+      color: #eab308;
+      padding: 6px 16px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>הגדרת אירוע חדש</h1>
+    <p>הגדירו את פרטי האירוע לפני פתיחת ההרשמה</p>
+  </div>
+
+  <!-- Setup form -->
+  <div class="screen setup-screen active" id="screenSetup">
+    <div class="setup-icon">⚙️</div>
+
+    <div class="config-banner" id="configBanner">
+      <div class="cb-text">אירוע כבר מוגדר. שינוי ההגדרות יאפס את כל הנתונים.</div>
+      <button class="cb-btn" onclick="document.getElementById('configBanner').classList.remove('show')">הבנתי, המשך</button>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>תאריך</label>
+        <input type="date" id="dateInput" />
+      </div>
+      <div class="form-group">
+        <label>שעת התחלה</label>
+        <input type="time" id="timeInput" value="10:00" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>מספר סבבים</label>
+        <input type="number" id="numSlots" value="5" min="1" max="20" />
+      </div>
+      <div class="form-group">
+        <label>משך סבב (דקות)</label>
+        <select id="slotDuration">
+          <option value="15">15 דקות</option>
+          <option value="20">20 דקות</option>
+          <option value="30" selected>30 דקות</option>
+          <option value="45">45 דקות</option>
+          <option value="60">60 דקות</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>מקסימום משתתפים בו-זמנית</label>
+      <input type="number" id="maxCapacity" value="50" min="1" max="1000" />
+      <div class="hint">מספר האנשים המותר בו-זמנית לפי הנחיות</div>
+    </div>
+
+    <div class="preview-box" id="previewBox">
+      <div class="preview-title">תצוגה מקדימה</div>
+      <div class="preview-slots" id="previewSlots"></div>
+      <div class="preview-summary">
+        <span>סה"כ משתתפים אפשריים:</span>
+        <span class="total" id="previewTotal"></span>
+      </div>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+    <button class="btn-create" id="btnCreate" onclick="createEvent()">צור אירוע</button>
+  </div>
+
+  <!-- Success -->
+  <div class="screen success-screen" id="screenSuccess">
+    <div class="success-icon">🎉</div>
+    <div class="success-title">האירוע הוגדר בהצלחה!</div>
+    <div class="success-sub" id="successSummary"></div>
+
+    <div class="links-box">
+      <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 4px;">קישורים לשיתוף</div>
+
+      <div class="link-row">
+        <span class="link-label">הרשמה מראש</span>
+        <span class="link-url" id="linkReg"></span>
+        <button class="btn-copy-sm" onclick="copyUrl('linkReg')">העתק</button>
+      </div>
+
+      <div class="link-row">
+        <span class="link-label">כניסה לאירוע</span>
+        <span class="link-url" id="linkCheckin"></span>
+        <button class="btn-copy-sm" onclick="copyUrl('linkCheckin')">העתק</button>
+      </div>
+
+      <div class="link-row">
+        <span class="link-label">לוח בקרה</span>
+        <span class="link-url" id="linkAdmin"></span>
+        <button class="btn-copy-sm" onclick="copyUrl('linkAdmin')">העתק</button>
+      </div>
+
+      <div class="link-row">
+        <span class="link-label">צפייה ציבורית</span>
+        <span class="link-url" id="linkLive"></span>
+        <button class="btn-copy-sm" onclick="copyUrl('linkLive')">העתק</button>
+      </div>
+    </div>
+
+    <a class="btn-nav admin" href="/admin.html">לוח בקרה</a>
+    <button class="btn-nav reconfig" onclick="showSetup()">שנה הגדרות</button>
+  </div>
+
+  <script>
+    const adminToken = new URLSearchParams(window.location.search).get('token') || '';
+    if (!adminToken) {
+      document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#94a3b8;font-family:sans-serif;"><h2>נדרשת הרשאת מנהל</h2><p>יש לגשת עם טוקן מנהל בקישור</p></div>';
+    }
+    function adminHeaders() {
+      return { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken };
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateInput').value = today;
+
+    checkConfig();
+
+    // Live preview on any change
+    ['dateInput', 'timeInput', 'numSlots', 'slotDuration', 'maxCapacity'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updatePreview);
+      document.getElementById(id).addEventListener('change', updatePreview);
+    });
+    updatePreview();
+
+    async function checkConfig() {
+      try {
+        const res = await fetch(`/api/admin/config?token=${adminToken}`);
+        const data = await res.json();
+        if (data.configured) {
+          document.getElementById('configBanner').classList.add('show');
+          // Pre-fill with current config
+          if (data.startTime) {
+            const d = new Date(data.startTime);
+            document.getElementById('dateInput').value = d.toISOString().split('T')[0];
+            document.getElementById('timeInput').value =
+              `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+          }
+          document.getElementById('numSlots').value = data.numSlots;
+          document.getElementById('slotDuration').value = data.slotDurationMin;
+          document.getElementById('maxCapacity').value = data.maxCapacity;
+          updatePreview();
+        }
+      } catch {}
+    }
+
+    function updatePreview() {
+      const date = document.getElementById('dateInput').value;
+      const time = document.getElementById('timeInput').value;
+      const numSlots = parseInt(document.getElementById('numSlots').value) || 0;
+      const duration = parseInt(document.getElementById('slotDuration').value) || 30;
+      const maxCap = parseInt(document.getElementById('maxCapacity').value) || 0;
+
+      const preview = document.getElementById('previewBox');
+      const slotsEl = document.getElementById('previewSlots');
+
+      if (!date || !time || numSlots < 1) {
+        preview.classList.remove('show');
+        return;
+      }
+
+      const start = new Date(`${date}T${time}`);
+      if (isNaN(start.getTime())) {
+        preview.classList.remove('show');
+        return;
+      }
+
+      let html = '';
+      for (let i = 0; i < Math.min(numSlots, 20); i++) {
+        const slotStart = new Date(start.getTime() + i * duration * 60000);
+        const slotEnd = new Date(slotStart.getTime() + duration * 60000);
+        const startStr = slotStart.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        const endStr = slotEnd.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        html += `
+          <div class="preview-slot">
+            <span class="ps-label">סבב ${i + 1}</span>
+            <span class="ps-time">${startStr} - ${endStr}</span>
+          </div>
+        `;
+      }
+
+      slotsEl.innerHTML = html;
+      document.getElementById('previewTotal').textContent = `${maxCap * numSlots} (${numSlots} x ${maxCap})`;
+
+      // Show end time
+      const eventEnd = new Date(start.getTime() + numSlots * duration * 60000);
+      const endStr = eventEnd.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+      const startStr = start.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+
+      preview.classList.add('show');
+    }
+
+    async function createEvent() {
+      const date = document.getElementById('dateInput').value;
+      const time = document.getElementById('timeInput').value;
+      const numSlots = parseInt(document.getElementById('numSlots').value);
+      const slotDurationMin = parseInt(document.getElementById('slotDuration').value);
+      const maxCapacity = parseInt(document.getElementById('maxCapacity').value);
+
+      if (!date || !time) { showError('יש להזין תאריך ושעה'); return; }
+      if (!numSlots || numSlots < 1) { showError('יש להזין מספר סבבים'); return; }
+      if (!maxCapacity || maxCapacity < 1) { showError('יש להזין מספר משתתפים'); return; }
+
+      const startTime = new Date(`${date}T${time}`);
+      if (isNaN(startTime.getTime())) { showError('תאריך או שעה לא תקינים'); return; }
+
+      const btn = document.getElementById('btnCreate');
+      btn.disabled = true;
+      btn.textContent = 'יוצר...';
+
+      try {
+        const res = await fetch('/api/admin/setup', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ startTime: startTime.toISOString(), numSlots, slotDurationMin, maxCapacity }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) { showError(data.error || 'שגיאה'); return; }
+
+        // Show success
+        const endTime = new Date(startTime.getTime() + numSlots * slotDurationMin * 60000);
+        const startStr = startTime.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        const endStr = endTime.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('successSummary').textContent =
+          `${numSlots} סבבים | ${startStr} - ${endStr} | עד ${maxCapacity} משתתפים | סה"כ ${data.totalCapacity} מקומות`;
+
+        const base = window.location.origin;
+        document.getElementById('linkReg').textContent = `${base}/register.html`;
+        document.getElementById('linkCheckin').textContent = `${base}/`;
+        document.getElementById('linkAdmin').textContent = `${base}/admin.html?token=${adminToken}`;
+        document.getElementById('linkLive').textContent = `${base}/live.html`;
+
+        if (navigator.vibrate) navigator.vibrate(100);
+        showScreen('screenSuccess');
+      } catch {
+        showError('שגיאת תקשורת');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'צור אירוע';
+      }
+    }
+
+    function showSetup() {
+      showScreen('screenSetup');
+      checkConfig();
+    }
+
+    function copyUrl(id) {
+      const url = document.getElementById(id).textContent;
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = event.target;
+        btn.textContent = 'הועתק!';
+        setTimeout(() => btn.textContent = 'העתק', 2000);
+      });
+    }
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 4000);
+    }
+  </script>
+</body>
+</html>

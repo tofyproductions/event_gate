@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>ניהול אירוע - לוח בקרה</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #22c55e;
+      --yellow: #eab308;
+      --orange: #f97316;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --purple: #a855f7;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+    }
+
+    .header {
+      background: var(--card);
+      padding: 16px 20px;
+      text-align: center;
+      border-bottom: 1px solid #334155;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header h1 { font-size: 1.1rem; }
+    .header .live-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      margin-left: 8px;
+      animation: blink 1.5s infinite;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .counter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 20px;
+      background: var(--card);
+      margin: 16px;
+      border-radius: 16px;
+    }
+    .counter-big {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1;
+      transition: color 0.3s;
+    }
+    .counter-info { text-align: right; }
+    .counter-info .label { color: var(--muted); font-size: 0.85rem; }
+    .counter-info .sub { font-size: 1.2rem; font-weight: 600; }
+
+    .progress-bar {
+      margin: 0 16px 16px;
+      height: 8px;
+      background: #334155;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease, background 0.3s;
+    }
+
+    .status-msg {
+      margin: 0 16px 16px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .status-ok { background: rgba(34,197,94,0.12); color: var(--green); }
+    .status-warn { background: rgba(234,179,8,0.12); color: var(--yellow); }
+    .status-danger { background: rgba(249,115,22,0.12); color: var(--orange); }
+    .status-full { background: rgba(239,68,68,0.15); color: var(--red); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+    /* Stats rows */
+    .stats-row {
+      display: flex;
+      gap: 10px;
+      padding: 0 16px 10px;
+    }
+    .stat-card {
+      flex: 1;
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-val { font-size: 1.5rem; font-weight: 700; }
+    .stat-lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+    /* Section */
+    .section-title {
+      padding: 12px 16px 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+    }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .badge-muted { background: rgba(148,163,184,0.15); color: var(--muted); }
+
+    .guest-list {
+      padding: 0 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .guest-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-right: 4px solid var(--green);
+    }
+    .guest-card.prereg { border-color: var(--blue); }
+    .guest-card.checked-out { border-color: var(--muted); opacity: 0.6; }
+    .guest-card.pending { border-color: var(--yellow); opacity: 0.8; }
+
+    .guest-info .guest-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .guest-info .guest-time {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .type-tag {
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .type-tag.tag-prereg { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .type-tag.tag-walkin { background: rgba(34,197,94,0.15); color: var(--green); }
+    .type-tag.tag-pending { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
+    .guest-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .guest-duration {
+      font-size: 1rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      direction: ltr;
+      min-width: 70px;
+      text-align: center;
+    }
+    .duration-warn { color: var(--yellow); }
+    .duration-long { color: var(--orange); }
+
+    .btn-small {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .btn-force-out {
+      background: rgba(249,115,22,0.15);
+      color: var(--orange);
+      border: 1px solid rgba(249,115,22,0.3);
+    }
+    .btn-release {
+      background: rgba(239,68,68,0.12);
+      color: var(--red);
+      border: 1px solid rgba(239,68,68,0.25);
+    }
+
+    .empty-msg {
+      text-align: center;
+      color: var(--muted);
+      padding: 20px 16px;
+      font-size: 0.9rem;
+    }
+
+    /* Toggleable sections */
+    .section-toggle {
+      margin: 0 16px 10px;
+      background: var(--card);
+      border: 1px solid #334155;
+      color: var(--muted);
+      padding: 10px;
+      border-radius: 10px;
+      width: calc(100% - 32px);
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-align: center;
+    }
+    .toggle-list {
+      display: none;
+      padding: 0 16px 12px;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .toggle-list.show { display: flex; }
+
+    /* Actions */
+    .admin-actions {
+      padding: 16px;
+      display: flex;
+      gap: 10px;
+      padding-bottom: 40px;
+    }
+    .admin-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .admin-btn.reset {
+      background: rgba(239,68,68,0.12);
+      color: var(--red);
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .admin-btn.export {
+      background: rgba(59,130,246,0.12);
+      color: #60a5fa;
+      border: 1px solid rgba(59,130,246,0.3);
+    }
+
+    /* Slot timeline */
+    .slot-timeline {
+      padding: 0 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slot-row {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-right: 4px solid #334155;
+      transition: border-color 0.3s;
+    }
+    .slot-row.slot-active { border-color: var(--green); background: rgba(34,197,94,0.05); }
+    .slot-row.slot-past { opacity: 0.5; }
+    .slot-row.slot-future { border-color: var(--blue); }
+    .slot-left { display: flex; flex-direction: column; gap: 2px; }
+    .slot-label { font-weight: 700; font-size: 0.95rem; direction: ltr; display: inline; }
+    .slot-num { font-size: 0.75rem; color: var(--muted); }
+    .slot-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .slot-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s;
+    }
+    .slot-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .slot-count {
+      font-size: 0.8rem;
+      padding: 3px 8px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    .slot-active-tag {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(34,197,94,0.15);
+      color: var(--green);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>לוח בקרה - ניהול אירוע <span class="live-dot"></span></h1>
+  </div>
+
+  <!-- Not configured banner -->
+  <div id="setupBanner" style="display:none; margin:16px; padding:20px; background:rgba(234,179,8,0.08); border:1px solid rgba(234,179,8,0.25); border-radius:14px; text-align:center;">
+    <div style="font-size:2rem; margin-bottom:8px;">⚙️</div>
+    <div style="font-weight:700; font-size:1rem; margin-bottom:6px;">האירוע טרם הוגדר</div>
+    <div style="color:var(--muted); font-size:0.85rem; margin-bottom:12px;">הגדירו את שעות הפעילות, מספר הסבבים וכמות המשתתפים</div>
+    <a id="setupLink" href="/setup.html" style="display:inline-block; padding:12px 24px; background:linear-gradient(135deg,#3b82f6,#2563eb); color:white; border-radius:12px; text-decoration:none; font-weight:700; font-size:0.95rem;">הגדר אירוע</a>
+  </div>
+
+  <!-- Counter -->
+  <div class="counter-bar">
+    <div>
+      <div class="counter-big" id="currentCount">0</div>
+    </div>
+    <div class="counter-info">
+      <div class="label">נוכחים כרגע</div>
+      <div class="sub">מתוך <span id="maxCap">50</span></div>
+    </div>
+  </div>
+
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+  </div>
+
+  <div class="status-msg status-ok" id="statusMsg">ממתין לאורחים</div>
+
+  <!-- Stats row 1 -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--green)" id="statTotal">0</div>
+      <div class="stat-lbl">סה"כ ביקרו</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--orange)" id="statOut">0</div>
+      <div class="stat-lbl">סה"כ יצאו</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--blue)" id="statAvg">-</div>
+      <div class="stat-lbl">שהייה ממוצעת</div>
+    </div>
+  </div>
+
+  <!-- Pre-registration stats row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--blue)" id="statRegTotal">0</div>
+      <div class="stat-lbl">נרשמו מראש</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--green)" id="statRegArrived">0</div>
+      <div class="stat-lbl">הגיעו (מראש)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--yellow)" id="statRegPending">0</div>
+      <div class="stat-lbl">טרם הגיעו</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--green)" id="statWalkinAvail">0</div>
+      <div class="stat-lbl">פנוי להזדמנים</div>
+    </div>
+  </div>
+
+  <!-- Slot timeline -->
+  <div class="section-title">
+    סבבים (חלונות זמן)
+  </div>
+  <div class="slot-timeline" id="slotTimeline"></div>
+
+  <!-- Active guests -->
+  <div class="section-title">
+    אורחים נוכחים <span class="badge badge-green" id="activeBadge">0</span>
+  </div>
+  <div class="guest-list" id="activeList">
+    <div class="empty-msg">אין אורחים כרגע</div>
+  </div>
+
+  <!-- Pre-registration list (always visible) -->
+  <div class="section-title">
+    רשימת נרשמים מראש <span class="badge badge-blue" id="regBadge">0</span>
+  </div>
+  <div class="guest-list" id="regFullList"></div>
+
+  <!-- History -->
+  <button class="section-toggle" onclick="toggleSection('historyList')">
+    היסטוריית יציאות ▼
+  </button>
+  <div class="toggle-list" id="historyList"></div>
+
+  <!-- Admin Actions -->
+  <div class="admin-actions">
+    <button class="admin-btn export" onclick="exportCSV()">ייצוא CSV</button>
+    <button class="admin-btn reset" onclick="resetAll()">איפוס</button>
+  </div>
+
+  <script>
+    let state = {
+      active: [], history: [], currentCount: 0, maxCapacity: 50,
+      totalVisitors: 0, totalCheckedOut: 0,
+      preRegistrations: [], regTotal: 0, regArrived: 0, regPending: 0, walkinSpotsAvailable: 0,
+    };
+
+    // Get admin token from URL
+    const adminToken = new URLSearchParams(window.location.search).get('token') || '';
+    if (!adminToken) {
+      document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#94a3b8;font-family:sans-serif;"><h2>נדרשת הרשאת מנהל</h2><p>יש לגשת עם טוקן מנהל בקישור</p></div>';
+    }
+
+    function adminHeaders() {
+      return { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken };
+    }
+    // Update setup link with token
+    const setupLink = document.getElementById('setupLink');
+    if (setupLink) setupLink.href = `/setup.html?token=${adminToken}`;
+
+    // SSE
+    function connectSSE() {
+      const evtSource = new EventSource(`/api/events?token=${adminToken}`);
+      evtSource.onmessage = (e) => {
+        try { state = JSON.parse(e.data); render(); } catch {}
+      };
+      evtSource.onerror = () => { evtSource.close(); setTimeout(connectSSE, 3000); };
+    }
+    connectSSE();
+    setInterval(updateDurations, 1000);
+
+    function render() {
+      // Setup banner
+      document.getElementById('setupBanner').style.display = state.configured ? 'none' : 'block';
+
+      const pct = state.currentCount / state.maxCapacity;
+
+      // Counter
+      const counterEl = document.getElementById('currentCount');
+      counterEl.textContent = state.currentCount;
+      let color;
+      if (pct >= 1) color = 'var(--red)';
+      else if (pct >= 0.9) color = 'var(--orange)';
+      else if (pct >= 0.7) color = 'var(--yellow)';
+      else color = 'var(--green)';
+      counterEl.style.color = color;
+      document.getElementById('maxCap').textContent = state.maxCapacity;
+
+      // Progress
+      const fill = document.getElementById('progressFill');
+      fill.style.width = `${Math.min(pct * 100, 100)}%`;
+      fill.style.background = color;
+
+      // Status
+      const statusEl = document.getElementById('statusMsg');
+      const remaining = state.maxCapacity - state.currentCount;
+      statusEl.className = 'status-msg';
+      if (state.currentCount >= state.maxCapacity) {
+        statusEl.classList.add('status-full');
+        statusEl.textContent = 'האירוע מלא!';
+      } else if (pct >= 0.9) {
+        statusEl.classList.add('status-danger');
+        statusEl.textContent = `נותרו ${remaining} מקומות בלבד!`;
+      } else if (pct >= 0.7) {
+        statusEl.classList.add('status-warn');
+        statusEl.textContent = `נותרו ${remaining} מקומות`;
+      } else if (state.currentCount === 0) {
+        statusEl.classList.add('status-ok');
+        statusEl.textContent = 'ממתין לאורחים';
+      } else {
+        statusEl.classList.add('status-ok');
+        statusEl.textContent = `${remaining} מקומות פנויים`;
+      }
+
+      // Stats row 1
+      document.getElementById('statTotal').textContent = state.totalVisitors;
+      document.getElementById('statOut').textContent = state.totalCheckedOut;
+      if (state.history.length > 0) {
+        const avg = state.history.reduce((s, g) => s + g.duration, 0) / state.history.length;
+        document.getElementById('statAvg').textContent = formatShort(avg);
+      } else {
+        document.getElementById('statAvg').textContent = '-';
+      }
+
+      // Stats row 2 - pre-registration
+      document.getElementById('statRegTotal').textContent = state.regTotal;
+      document.getElementById('statRegArrived').textContent = state.regArrived;
+      document.getElementById('statRegPending').textContent = state.regPending;
+      document.getElementById('statWalkinAvail').textContent = state.walkinSpotsAvailable;
+      // Badges
+      document.getElementById('activeBadge').textContent = state.currentCount;
+      document.getElementById('regBadge').textContent = state.regTotal;
+
+      renderSlotTimeline();
+      renderActiveList();
+      renderRegFullList();
+      renderHistory();
+    }
+
+    function renderSlotTimeline() {
+      const timeline = document.getElementById('slotTimeline');
+      const slots = state.slotStats || [];
+      if (slots.length === 0) {
+        timeline.innerHTML = '<div class="empty-msg">אין סבבים מוגדרים</div>';
+        return;
+      }
+
+      const now = Date.now();
+      timeline.innerHTML = slots.map(slot => {
+        const isCurrent = state.currentSlotIndex === slot.index;
+        const isPast = now >= slot.endTime;
+        const isFuture = now < slot.startTime;
+
+        let rowClass = '';
+        if (isCurrent) rowClass = 'slot-active';
+        else if (isPast) rowClass = 'slot-past';
+        else if (isFuture) rowClass = 'slot-future';
+
+        const pct = Math.min((slot.registered / state.maxCapacity) * 100, 100);
+        let barColor = 'var(--green)';
+        if (pct >= 90) barColor = 'var(--red)';
+        else if (pct >= 70) barColor = 'var(--yellow)';
+
+        const arrivedText = slot.arrived > 0 ? `${slot.arrived} הגיעו` : '';
+        const pendingText = slot.pending > 0 ? `${slot.pending} ממתינים` : '';
+        const countParts = [arrivedText, pendingText].filter(Boolean).join(' | ');
+
+        return `
+          <div class="slot-row ${rowClass}">
+            <div class="slot-left" style="flex:1">
+              <div>
+                <span class="slot-label">${slot.label}</span>
+                <span class="slot-num">סבב ${slot.index + 1}</span>
+                ${isCurrent ? '<span class="slot-active-tag">עכשיו</span>' : ''}
+              </div>
+              <div class="slot-bar-wrap">
+                <div class="slot-bar-fill" style="width:${pct}%; background:${barColor}"></div>
+              </div>
+            </div>
+            <div class="slot-right">
+              <span class="slot-count" style="color:var(--muted)">${slot.registered}/${state.maxCapacity}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderActiveList() {
+      const list = document.getElementById('activeList');
+      if (state.active.length === 0) {
+        list.innerHTML = '<div class="empty-msg">אין אורחים כרגע</div>';
+        return;
+      }
+      const now = Date.now();
+      list.innerHTML = state.active.map(g => {
+        const dur = now - g.checkinTime;
+        const durClass = dur > 7200000 ? 'duration-long' : dur > 3600000 ? 'duration-warn' : '';
+        const timeIn = new Date(g.checkinTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        const isPrereg = g.type === 'preregistered';
+        const tagClass = isPrereg ? 'tag-prereg' : 'tag-walkin';
+        const tagText = isPrereg ? 'מראש' : 'הזדמן';
+
+        return `
+          <div class="guest-card ${isPrereg ? 'prereg' : ''}">
+            <div class="guest-info">
+              <div class="guest-name">
+                ${escapeHtml(g.name)}
+                <span class="type-tag ${tagClass}">${tagText}</span>
+              </div>
+              <div class="guest-time">נכנס/ה ב-${timeIn}</div>
+            </div>
+            <div class="guest-right">
+              <div class="guest-duration ${durClass}" data-checkin="${g.checkinTime}">${formatTime(dur)}</div>
+              <button class="btn-small btn-force-out" onclick="forceCheckout('${g.id}')">הוצא/י</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderRegFullList() {
+      const list = document.getElementById('regFullList');
+      const regs = state.preRegistrations || [];
+      if (regs.length === 0) {
+        list.innerHTML = '<div class="empty-msg">אין נרשמים מראש עדיין</div>';
+        return;
+      }
+
+      // Sort: arrived first (by checkin time), then pending
+      const arrivedGuests = new Map();
+      for (const g of [...state.active, ...state.history]) {
+        if (g.regCode) arrivedGuests.set(g.regCode, g);
+      }
+
+      // Sort by slot, then arrived status
+      const sorted = [...regs].sort((a, b) => {
+        if (a.slotIndex !== b.slotIndex) return (a.slotIndex || 0) - (b.slotIndex || 0);
+        if (a.arrived && !b.arrived) return -1;
+        if (!a.arrived && b.arrived) return 1;
+        return a.registeredAt - b.registeredAt;
+      });
+
+      const slots = state.slots || [];
+
+      list.innerHTML = sorted.map(r => {
+        const regTime = new Date(r.registeredAt).toLocaleString('he-IL', {
+          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
+        const slot = slots[r.slotIndex];
+        const slotLabel = slot ? `סבב ${r.slotIndex + 1} (${slot.label})` : '';
+
+        if (r.arrived) {
+          // Find matching guest for duration
+          const guest = arrivedGuests.get(r.code);
+          const now = Date.now();
+          let durationHtml = '';
+          let statusTag = '';
+
+          if (guest && !guest.checkoutTime) {
+            // Currently present
+            const dur = now - guest.checkinTime;
+            const timeIn = new Date(guest.checkinTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            const durClass = dur > 7200000 ? 'duration-long' : dur > 3600000 ? 'duration-warn' : '';
+            durationHtml = `<div class="guest-duration ${durClass}" data-checkin="${guest.checkinTime}">${formatTime(dur)}</div>`;
+            statusTag = '<span class="type-tag" style="background:rgba(34,197,94,0.15);color:var(--green);">באירוע</span>';
+          } else if (guest && guest.checkoutTime) {
+            // Already left
+            durationHtml = `<div class="guest-duration" style="opacity:0.5">${formatTime(guest.checkoutTime - guest.checkinTime)}</div>`;
+            statusTag = '<span class="type-tag" style="background:rgba(148,163,184,0.15);color:var(--muted);">עזב/ה</span>';
+          } else {
+            statusTag = '<span class="type-tag" style="background:rgba(34,197,94,0.15);color:var(--green);">הגיע/ה</span>';
+          }
+
+          return `
+            <div class="guest-card prereg">
+              <div class="guest-info">
+                <div class="guest-name">
+                  ${escapeHtml(r.name)} ${statusTag}
+                </div>
+                <div class="guest-time">${slotLabel} | ${r.phone ? escapeHtml(r.phone) : ''}</div>
+              </div>
+              <div class="guest-right">
+                ${durationHtml}
+              </div>
+            </div>
+          `;
+        } else {
+          // Pending - not yet arrived
+          return `
+            <div class="guest-card pending">
+              <div class="guest-info">
+                <div class="guest-name">
+                  ${escapeHtml(r.name)}
+                  <span class="type-tag tag-pending">טרם הגיע/ה</span>
+                </div>
+                <div class="guest-time">${slotLabel} | ${r.phone ? escapeHtml(r.phone) : ''}</div>
+              </div>
+              <div class="guest-right">
+                <span style="font-size: 0.7rem; color: var(--muted); direction: ltr; font-variant-numeric: tabular-nums;">${r.code}</span>
+                <button class="btn-small btn-release" onclick="releaseReg('${r.code}')">שחרר</button>
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+    }
+
+    function renderHistory() {
+      const list = document.getElementById('historyList');
+      if (state.history.length === 0) {
+        list.innerHTML = '<div class="empty-msg">אין היסטוריה עדיין</div>';
+        return;
+      }
+      list.innerHTML = state.history.map(g => {
+        const timeIn = new Date(g.checkinTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        const timeOut = new Date(g.checkoutTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+        const isPrereg = g.type === 'preregistered';
+        return `
+          <div class="guest-card checked-out">
+            <div class="guest-info">
+              <div class="guest-name">
+                ${escapeHtml(g.name)}
+                <span class="type-tag ${isPrereg ? 'tag-prereg' : 'tag-walkin'}">${isPrereg ? 'מראש' : 'הזדמן'}</span>
+              </div>
+              <div class="guest-time">${timeIn} → ${timeOut}</div>
+            </div>
+            <div class="guest-duration">${formatTime(g.duration)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateDurations() {
+      const now = Date.now();
+      document.querySelectorAll('.guest-duration[data-checkin]').forEach(el => {
+        const checkin = parseInt(el.dataset.checkin);
+        const dur = now - checkin;
+        el.textContent = formatTime(dur);
+        el.classList.remove('duration-warn', 'duration-long');
+        if (dur > 7200000) el.classList.add('duration-long');
+        else if (dur > 3600000) el.classList.add('duration-warn');
+      });
+    }
+
+    function formatTime(ms) {
+      const m = Math.floor(ms / 60000) % 60;
+      const h = Math.floor(ms / 3600000);
+      if (h > 0) return `${h}:${String(m).padStart(2, '0')} שע׳`;
+      const s = Math.floor(ms / 1000) % 60;
+      return `${m}:${String(s).padStart(2, '0')} דק׳`;
+    }
+    function formatShort(ms) {
+      const m = Math.round(ms / 60000);
+      if (m < 60) return `${m} דק׳`;
+      const h = Math.floor(m / 60);
+      return `${h}:${String(m % 60).padStart(2, '0')} שע׳`;
+    }
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    async function forceCheckout(id) {
+      if (!confirm('להוציא את האורח מהרשימה?')) return;
+      await fetch(`/api/admin/checkout/${id}`, { method: 'POST', headers: adminHeaders() });
+    }
+
+    async function releaseReg(code) {
+      if (!confirm('לשחרר את המקום? האורח לא יוכל להיכנס עם הקוד הזה.')) return;
+      await fetch(`/api/admin/release/${code}`, { method: 'POST', headers: adminHeaders() });
+    }
+
+    async function resetAll() {
+      if (!confirm('האם לאפס את כל הנתונים? פעולה זו בלתי הפיכה.')) return;
+      await fetch('/api/admin/reset', { method: 'POST', headers: adminHeaders() });
+    }
+
+    function toggleSection(id) {
+      document.getElementById(id).classList.toggle('show');
+    }
+
+    // CSV injection protection
+    function csvSafe(str) {
+      if (typeof str !== 'string') return str;
+      if (/^[=+\-@\t\r]/.test(str)) return "'" + str;
+      return str;
+    }
+
+    function exportCSV() {
+      const bom = '\uFEFF';
+      let csv = bom + 'שם,סוג,כניסה,יציאה,משך שהייה (דקות),סטטוס\n';
+      const now = Date.now();
+      for (const g of state.active) {
+        const timeIn = new Date(g.checkinTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dur = Math.round((now - g.checkinTime) / 60000);
+        const type = g.type === 'preregistered' ? 'נרשם מראש' : 'הזדמן';
+        csv += `"${csvSafe(g.name)}",${type},${timeIn},,${dur},נוכח\n`;
+      }
+      for (const g of state.history) {
+        const timeIn = new Date(g.checkinTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const timeOut = new Date(g.checkoutTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dur = Math.round(g.duration / 60000);
+        const type = g.type === 'preregistered' ? 'נרשם מראש' : 'הזדמן';
+        csv += `"${csvSafe(g.name)}",${type},${timeIn},${timeOut},${dur},יצא\n`;
+      }
+      const pending = (state.preRegistrations || []).filter(r => !r.arrived);
+      for (const r of pending) {
+        csv += `"${csvSafe(r.name)}",נרשם מראש,,,0,לא הגיע\n`;
+      }
+      csv += `\nסיכום\n`;
+      csv += `סה"כ ביקרו,${state.totalVisitors}\n`;
+      csv += `נוכחים כרגע,${state.currentCount}\n`;
+      csv += `נרשמו מראש,${state.regTotal}\n`;
+      csv += `הגיעו (מראש),${state.regArrived}\n`;
+      csv += `טרם הגיעו,${state.regPending}\n`;
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `דוח_אירוע_${new Date().toLocaleDateString('he-IL').replace(/\./g, '-')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
