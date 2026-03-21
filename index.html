@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Event Gate - ניהול זרימת קהל</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --green:#22c55e;--yellow:#eab308;--orange:#f97316;--red:#ef4444;
+      --blue:#3b82f6;--purple:#a855f7;
+      --bg:#0f172a;--card:#1e293b;--text:#f1f5f9;--muted:#94a3b8;
+      --border:#334155;--input-border:#475569;
+    }
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100dvh;
+      overflow-x:hidden;
+    }
+    button{font-family:inherit}
+    input,select{font-family:inherit}
+
+    /* ===== NAV ===== */
+    .nav{
+      display:flex;background:var(--card);border-bottom:1px solid var(--border);
+      position:sticky;top:0;z-index:100;overflow-x:auto;
+    }
+    .nav-btn{
+      flex:1;min-width:0;padding:12px 6px;border:none;background:none;
+      color:var(--muted);font-size:.7rem;font-weight:600;cursor:pointer;
+      text-align:center;white-space:nowrap;transition:color .2s,border-color .2s;
+      border-bottom:3px solid transparent;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .nav-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
+    .nav-btn .nav-icon{font-size:1.2rem;display:block;margin-bottom:2px}
+
+    /* ===== PAGES ===== */
+    .page{display:none;padding:16px;padding-bottom:40px;min-height:calc(100dvh - 56px)}
+    .page.active{display:block}
+
+    /* ===== COMMON ===== */
+    .card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:12px}
+    .card-title{font-weight:700;font-size:.95rem;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+    .form-group{margin-bottom:14px}
+    .form-group label{display:block;font-weight:600;font-size:.9rem;margin-bottom:6px}
+    .form-group .hint{font-size:.75rem;color:var(--muted);margin-top:4px}
+    .form-group input,.form-group select{
+      width:100%;padding:12px 14px;background:var(--bg);
+      border:2px solid var(--input-border);border-radius:12px;
+      color:var(--text);font-size:1rem;outline:none;transition:border-color .2s;
+      -webkit-appearance:none;
+    }
+    .form-group input:focus,.form-group select:focus{border-color:#60a5fa}
+    .form-group input[type="date"],.form-group input[type="time"]{color-scheme:dark}
+    .form-row{display:flex;gap:10px}
+    .form-row .form-group{flex:1}
+
+    .btn-primary{
+      width:100%;padding:16px;border:none;border-radius:14px;
+      font-size:1.1rem;font-weight:700;cursor:pointer;
+      transition:transform .1s;-webkit-tap-highlight-color:transparent;
+      color:white;
+    }
+    .btn-primary:active{transform:scale(.97)}
+    .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+    .btn-primary.green{background:linear-gradient(135deg,#22c55e,#16a34a)}
+    .btn-primary.blue{background:linear-gradient(135deg,#3b82f6,#2563eb)}
+    .btn-primary.orange{background:linear-gradient(135deg,#f97316,#ea580c)}
+    .btn-primary.red{background:linear-gradient(135deg,#ef4444,#dc2626)}
+
+    .btn-sm{
+      padding:6px 12px;border-radius:8px;font-size:.75rem;font-weight:600;
+      cursor:pointer;white-space:nowrap;border:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .btn-sm.red{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+    .btn-sm.blue{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.25)}
+    .btn-sm.green{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25)}
+    .btn-sm.orange{background:rgba(249,115,22,.12);color:var(--orange);border:1px solid rgba(249,115,22,.25)}
+
+    .badge{padding:2px 10px;border-radius:20px;font-size:.75rem;font-weight:600}
+    .badge-green{background:rgba(34,197,94,.12);color:var(--green)}
+    .badge-blue{background:rgba(59,130,246,.12);color:var(--blue)}
+    .badge-yellow{background:rgba(234,179,8,.12);color:var(--yellow)}
+    .badge-muted{background:rgba(148,163,184,.12);color:var(--muted)}
+
+    .empty-msg{text-align:center;color:var(--muted);padding:24px 16px;font-size:.9rem}
+    .error-toast{
+      position:fixed;top:70px;left:16px;right:16px;z-index:200;
+      background:rgba(239,68,68,.95);color:white;padding:12px 16px;
+      border-radius:12px;text-align:center;font-weight:600;font-size:.9rem;
+      display:none;animation:slideDown .3s;
+    }
+    .success-toast{
+      position:fixed;top:70px;left:16px;right:16px;z-index:200;
+      background:rgba(34,197,94,.95);color:white;padding:12px 16px;
+      border-radius:12px;text-align:center;font-weight:600;font-size:.9rem;
+      display:none;animation:slideDown .3s;
+    }
+    @keyframes slideDown{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+    /* ===== SETUP PAGE ===== */
+    .preview-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px}
+    .preview-slot{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:6px 10px;background:var(--card);border-radius:8px;margin-bottom:4px;font-size:.85rem;
+    }
+    .preview-slot .ps-time{direction:ltr;font-weight:600}
+    .preview-slot .ps-label{color:var(--muted);font-size:.75rem}
+    .preview-summary{margin-top:8px;font-size:.85rem;color:var(--muted);display:flex;justify-content:space-between}
+    .preview-summary .total{color:var(--green);font-weight:700}
+
+    /* ===== DASHBOARD PAGE ===== */
+    .counter-bar{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px}
+    .counter-big{font-size:3.5rem;font-weight:800;line-height:1;transition:color .3s}
+    .counter-info{text-align:right}
+    .counter-info .label{color:var(--muted);font-size:.85rem}
+    .counter-info .sub{font-size:1.2rem;font-weight:600}
+
+    .progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:12px}
+    .progress-fill{height:100%;border-radius:4px;transition:width .5s,background .3s}
+
+    .status-msg{
+      padding:12px 16px;border-radius:12px;text-align:center;
+      font-weight:600;font-size:.95rem;margin-bottom:14px;
+    }
+    .status-ok{background:rgba(34,197,94,.1);color:var(--green)}
+    .status-warn{background:rgba(234,179,8,.1);color:var(--yellow)}
+    .status-danger{background:rgba(249,115,22,.1);color:var(--orange)}
+    .status-full{background:rgba(239,68,68,.12);color:var(--red);animation:pulse 1.5s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+    .stats-row{display:flex;gap:8px;margin-bottom:12px}
+    .stat-card{flex:1;background:var(--card);border-radius:10px;padding:10px;text-align:center}
+    .stat-val{font-size:1.4rem;font-weight:700}
+    .stat-lbl{font-size:.65rem;color:var(--muted);margin-top:2px}
+
+    .guest-card{
+      background:var(--card);border-radius:12px;padding:12px 14px;
+      display:flex;justify-content:space-between;align-items:center;
+      margin-bottom:8px;border-right:4px solid var(--green);
+    }
+    .guest-card.prereg{border-color:var(--blue)}
+    .guest-card.pending{border-color:var(--yellow);opacity:.8}
+    .guest-card.out{border-color:var(--muted);opacity:.5}
+    .guest-name{font-weight:600;font-size:.9rem;display:flex;align-items:center;gap:6px}
+    .guest-sub{font-size:.75rem;color:var(--muted);margin-top:2px}
+    .guest-right{display:flex;align-items:center;gap:8px}
+    .guest-dur{
+      font-size:.9rem;font-weight:600;font-variant-numeric:tabular-nums;
+      direction:ltr;min-width:60px;text-align:center;
+    }
+    .dur-warn{color:var(--yellow)}
+    .dur-long{color:var(--orange)}
+
+    .type-tag{font-size:.6rem;padding:1px 6px;border-radius:6px;font-weight:600}
+    .tag-prereg{background:rgba(59,130,246,.12);color:var(--blue)}
+    .tag-walkin{background:rgba(34,197,94,.12);color:var(--green)}
+    .tag-pending{background:rgba(234,179,8,.12);color:var(--yellow)}
+    .tag-out{background:rgba(148,163,184,.12);color:var(--muted)}
+
+    /* Slot timeline */
+    .slot-row{
+      background:var(--card);border-radius:10px;padding:10px 12px;
+      margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;
+      border-right:4px solid var(--border);
+    }
+    .slot-row.slot-active{border-color:var(--green);background:rgba(34,197,94,.04)}
+    .slot-row.slot-past{opacity:.4}
+    .slot-row.slot-future{border-color:var(--blue)}
+    .slot-label{font-weight:600;font-size:.85rem;direction:ltr}
+    .slot-num{font-size:.7rem;color:var(--muted)}
+    .slot-bar-wrap{width:100%;height:4px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden}
+    .slot-bar-fill{height:100%;border-radius:2px;transition:width .4s}
+    .slot-active-tag{font-size:.6rem;padding:2px 6px;border-radius:6px;background:rgba(34,197,94,.12);color:var(--green);font-weight:600;margin-right:4px}
+
+    .section-title{font-size:.9rem;font-weight:700;margin:14px 0 8px;display:flex;align-items:center;gap:8px}
+    .collapsible-btn{
+      width:100%;background:var(--card);border:1px solid var(--border);
+      color:var(--muted);padding:10px;border-radius:10px;font-size:.85rem;
+      cursor:pointer;text-align:center;margin-bottom:8px;
+    }
+    .collapsible{display:none}
+    .collapsible.show{display:block}
+
+    /* ===== CHECKIN PAGE ===== */
+    .checkin-tabs{display:flex;gap:8px;margin-bottom:16px}
+    .checkin-tab{
+      flex:1;padding:12px;background:var(--card);border:2px solid var(--border);
+      border-radius:12px;cursor:pointer;text-align:center;
+      transition:border-color .2s;-webkit-tap-highlight-color:transparent;
+    }
+    .checkin-tab.active{border-color:var(--blue);background:rgba(59,130,246,.05)}
+    .checkin-tab .tab-icon{font-size:1.5rem;display:block;margin-bottom:4px}
+    .checkin-tab .tab-title{font-weight:700;font-size:.9rem}
+    .checkin-tab .tab-desc{font-size:.75rem;color:var(--muted);margin-top:2px}
+    .checkin-panel{display:none}
+    .checkin-panel.active{display:block}
+
+    .code-input{
+      text-align:center!important;direction:ltr;letter-spacing:4px;
+      font-size:1.4rem!important;font-weight:700;text-transform:uppercase;
+    }
+
+    /* ===== REGISTER PAGE ===== */
+    .slot-option{
+      display:flex;justify-content:space-between;align-items:center;
+      background:var(--card);border:2px solid var(--border);border-radius:12px;
+      padding:14px 16px;cursor:pointer;transition:border-color .2s;margin-bottom:8px;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .slot-option:hover{border-color:var(--input-border)}
+    .slot-option.selected{border-color:var(--blue);background:rgba(59,130,246,.06)}
+    .slot-option.full{opacity:.4;cursor:not-allowed}
+    .slot-time{font-weight:600;font-size:.95rem;direction:ltr}
+    .slot-info{font-size:.75rem;color:var(--muted)}
+    .slot-avail{font-size:.7rem;padding:3px 8px;border-radius:8px}
+    .avail-ok{background:rgba(34,197,94,.1);color:var(--green)}
+    .avail-low{background:rgba(234,179,8,.1);color:var(--yellow)}
+    .avail-full{background:rgba(239,68,68,.1);color:var(--red)}
+
+    .code-result{
+      background:var(--card);border:2px dashed var(--input-border);
+      border-radius:14px;padding:20px;text-align:center;margin:12px 0;
+    }
+    .code-result .code-val{font-size:2.2rem;font-weight:800;letter-spacing:4px;color:var(--blue);direction:ltr;font-variant-numeric:tabular-nums}
+    .code-result .code-lbl{font-size:.8rem;color:var(--muted);margin-bottom:6px}
+
+    /* ===== LIVE PAGE ===== */
+    .live-ring{width:200px;height:200px;margin:0 auto 16px;position:relative}
+    .live-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+    .live-ring .bg-circle{fill:none;stroke:var(--border);stroke-width:12}
+    .live-ring .prog-circle{fill:none;stroke-width:12;stroke-linecap:round;transition:stroke-dashoffset .5s,stroke .3s}
+    .live-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+    .live-number{font-size:3.5rem;font-weight:800;line-height:1;transition:color .3s}
+    .live-label{font-size:.85rem;color:var(--muted);margin-top:4px}
+    .live-max{font-size:1rem;color:var(--muted)}
+
+    /* ===== ACTIONS ROW ===== */
+    .actions-row{display:flex;gap:8px;margin-top:12px}
+    .actions-row button{flex:1}
+
+    @media(max-width:360px){
+      .nav-btn{font-size:.6rem;padding:10px 4px}
+      .nav-btn .nav-icon{font-size:1rem}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toast messages -->
+<div class="error-toast" id="errorToast"></div>
+<div class="success-toast" id="successToast"></div>
+
+<!-- Navigation -->
+<nav class="nav">
+  <button class="nav-btn active" onclick="showPage('setup')" data-page="setup">
+    <span class="nav-icon">&#9881;</span>הגדרות
+  </button>
+  <button class="nav-btn" onclick="showPage('register')" data-page="register">
+    <span class="nav-icon">&#128203;</span>הרשמה
+  </button>
+  <button class="nav-btn" onclick="showPage('checkin')" data-page="checkin">
+    <span class="nav-icon">&#128682;</span>כניסה
+  </button>
+  <button class="nav-btn" onclick="showPage('dashboard')" data-page="dashboard">
+    <span class="nav-icon">&#128202;</span>ניהול
+  </button>
+  <button class="nav-btn" onclick="showPage('live')" data-page="live">
+    <span class="nav-icon">&#128308;</span>לייב
+  </button>
+</nav>
+
+<!-- ==================== SETUP PAGE ==================== -->
+<div class="page active" id="page-setup">
+  <div class="card">
+    <div class="card-title">&#9881;&#65039; הגדרת אירוע</div>
+    <div class="form-group">
+      <label>שם לקוח / עסק</label>
+      <input type="text" id="cfgClientName" placeholder="שם הלקוח או העסק" autocomplete="off" />
+      <div class="hint">שם זה יוצג בקישור הצפייה של הלקוח</div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>תאריך</label>
+        <input type="date" id="cfgDate" />
+      </div>
+      <div class="form-group">
+        <label>שעת התחלה</label>
+        <input type="time" id="cfgTime" value="10:00" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>מספר סבבים</label>
+        <input type="number" id="cfgSlots" value="5" min="1" max="20" />
+      </div>
+      <div class="form-group">
+        <label>משך סבב (דקות)</label>
+        <select id="cfgDuration">
+          <option value="15">15</option>
+          <option value="20">20</option>
+          <option value="30" selected>30</option>
+          <option value="45">45</option>
+          <option value="60">60</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>מקסימום משתתפים בו-זמנית</label>
+      <input type="number" id="cfgMax" value="50" min="1" max="1000" />
+      <div class="hint">מספר האנשים המותר באותו זמן לפי הנחיות</div>
+    </div>
+
+    <div id="setupPreview"></div>
+
+    <div style="margin-top:14px">
+      <button class="btn-primary green" onclick="saveSetup()">שמור והפעל אירוע</button>
+    </div>
+  </div>
+
+  <!-- Client link (shown after setup) -->
+  <div class="card" id="clientLinkCard" style="display:none">
+    <div class="card-title">&#128279; קישור צפייה ללקוח</div>
+    <div style="font-size:.85rem;color:var(--muted);margin-bottom:8px">שתפו קישור זה עם הלקוח לצפייה בלייב באירוע</div>
+    <div style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:10px 14px;border-radius:10px;border:1px solid var(--border)">
+      <span id="clientLinkUrl" style="flex:1;font-size:.75rem;color:var(--muted);direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button class="btn-sm blue" onclick="copyClientLink()">העתק</button>
+    </div>
+    <div style="margin-top:8px;font-size:.8rem;color:var(--muted)">לקוח: <strong id="clientLinkName" style="color:var(--text)"></strong></div>
+  </div>
+
+  <div class="card" style="margin-top:8px">
+    <div class="card-title" style="color:var(--red)">&#9888;&#65039; אזור מסוכן</div>
+    <button class="btn-primary red" onclick="resetAll()" style="font-size:.9rem;padding:12px">איפוס מלא - מחיקת כל הנתונים</button>
+  </div>
+</div>
+
+<!-- ==================== REGISTER PAGE ==================== -->
+<div class="page" id="page-register">
+  <div id="regFormSection">
+    <div class="card">
+      <div class="card-title">&#128203; הרשמה מראש לאירוע</div>
+      <div style="color:var(--muted);font-size:.85rem;margin-bottom:14px">
+        הבטיחו את מקומכם מראש
+      </div>
+      <div class="form-group">
+        <label>שם מלא</label>
+        <input type="text" id="regName" placeholder="הכניסו שם" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label>טלפון <span style="font-weight:400;color:var(--muted);font-size:.8rem">(אופציונלי)</span></label>
+        <input type="tel" id="regPhone" placeholder="050-1234567" autocomplete="tel" />
+      </div>
+      <div class="form-group">
+        <label>בחרו חלון זמן</label>
+        <div id="regSlotGrid"></div>
+      </div>
+      <button class="btn-primary blue" onclick="doRegister()">הרשמה</button>
+    </div>
+  </div>
+  <div id="regSuccessSection" style="display:none">
+    <div class="card" style="text-align:center">
+      <div style="font-size:3rem;margin-bottom:8px">&#127881;</div>
+      <div style="font-size:1.2rem;font-weight:700;margin-bottom:4px">נרשמתם בהצלחה!</div>
+      <div id="regSuccessName" style="color:var(--muted);margin-bottom:4px"></div>
+      <div id="regSuccessSlot" class="badge badge-blue" style="margin-bottom:12px"></div>
+      <div class="code-result">
+        <div class="code-lbl">קוד הכניסה שלכם</div>
+        <div class="code-val" id="regSuccessCode"></div>
+      </div>
+      <div style="color:var(--muted);font-size:.85rem;margin-bottom:16px;line-height:1.6">
+        שמרו את הקוד! ביום האירוע הציגו אותו בכניסה
+      </div>
+      <button class="btn-primary blue" onclick="showRegForm()">הרשמה נוספת</button>
+    </div>
+  </div>
+  <div id="regNotConfigured" style="display:none">
+    <div class="card" style="text-align:center;padding:40px 16px">
+      <div style="font-size:3rem;margin-bottom:8px">&#128295;</div>
+      <div style="font-weight:700;margin-bottom:4px">האירוע טרם הוגדר</div>
+      <div style="color:var(--muted);font-size:.9rem">ההרשמה תיפתח לאחר הגדרת האירוע</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CHECKIN PAGE ==================== -->
+<div class="page" id="page-checkin">
+  <div id="checkinMain">
+    <div class="checkin-tabs">
+      <div class="checkin-tab active" onclick="showCheckinTab('code')">
+        <span class="tab-icon">&#127915;</span>
+        <div class="tab-title">עם קוד</div>
+        <div class="tab-desc">נרשם מראש</div>
+      </div>
+      <div class="checkin-tab" onclick="showCheckinTab('walkin')">
+        <span class="tab-icon">&#128694;</span>
+        <div class="tab-title">הזדמן</div>
+        <div class="tab-desc">ללא הרשמה</div>
+      </div>
+    </div>
+
+    <!-- Code check-in -->
+    <div class="checkin-panel active" id="panel-code">
+      <div class="card">
+        <div class="form-group">
+          <label>קוד הרשמה</label>
+          <input type="text" id="ciCode" class="code-input" placeholder="ABCD1234" autocomplete="off" maxlength="8" />
+        </div>
+        <button class="btn-primary blue" onclick="doCodeCheckin()">כניסה עם קוד</button>
+      </div>
+    </div>
+
+    <!-- Walk-in check-in -->
+    <div class="checkin-panel" id="panel-walkin">
+      <div class="card">
+        <div class="form-group">
+          <label>שם מלא</label>
+          <input type="text" id="ciName" placeholder="הכניסו שם" autocomplete="name" />
+        </div>
+        <button class="btn-primary green" onclick="doWalkinCheckin()">כניסה לאירוע</button>
+      </div>
+    </div>
+
+    <!-- Current count mini -->
+    <div class="card" style="text-align:center">
+      <span style="font-size:2rem;font-weight:800" id="ciCount">0</span>
+      <span style="color:var(--muted)"> / </span>
+      <span id="ciMax">50</span>
+      <div style="font-size:.8rem;color:var(--muted)">נוכחים כרגע</div>
+    </div>
+  </div>
+
+  <!-- Active guest screen (after check-in) -->
+  <div id="checkinActive" style="display:none">
+    <div class="card" style="text-align:center;padding:30px 16px">
+      <div style="font-size:4rem;margin-bottom:8px">&#9989;</div>
+      <div style="font-size:1.4rem;font-weight:700;margin-bottom:4px" id="ciActiveName"></div>
+      <div id="ciActiveBadge" style="margin-bottom:8px"></div>
+      <div style="color:var(--green);font-weight:600;margin-bottom:16px">נוכח/ת באירוע</div>
+      <div style="font-size:2.5rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted);direction:ltr" id="ciActiveTimer">00:00</div>
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:20px">זמן שהייה</div>
+      <button class="btn-primary orange" onclick="doCheckout()">יציאה מהאירוע</button>
+    </div>
+  </div>
+
+  <!-- Done screen -->
+  <div id="checkinDone" style="display:none">
+    <div class="card" style="text-align:center;padding:30px 16px">
+      <div style="font-size:4rem;margin-bottom:8px">&#128079;</div>
+      <div style="font-size:1.2rem;font-weight:700;margin-bottom:4px">תודה שהגעתם!</div>
+      <div id="ciDoneDur" style="color:var(--muted);font-size:.95rem;margin-bottom:20px"></div>
+      <button class="btn-primary blue" onclick="resetCheckin()">כניסה מחדש</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DASHBOARD PAGE ==================== -->
+<div class="page" id="page-dashboard">
+  <div id="dbClientHeader" style="display:none;text-align:center;padding:0 0 8px;font-size:.85rem;color:var(--muted)">אירוע עבור: <strong id="dbClientName" style="color:var(--text)"></strong></div>
+  <div class="card">
+    <div class="counter-bar">
+      <div>
+        <div class="counter-big" id="dbCount">0</div>
+      </div>
+      <div class="counter-info">
+        <div class="label">נוכחים כרגע</div>
+        <div class="sub">מתוך <span id="dbMax">50</span></div>
+      </div>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="dbFill" style="width:0%"></div>
+    </div>
+    <div class="status-msg status-ok" id="dbStatus">ממתין לאורחים</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" style="color:var(--green)" id="dbTotal">0</div><div class="stat-lbl">סה"כ ביקרו</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--orange)" id="dbOut">0</div><div class="stat-lbl">יצאו</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--blue)" id="dbAvg">-</div><div class="stat-lbl">שהייה ממוצעת</div></div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" style="color:var(--blue)" id="dbRegTotal">0</div><div class="stat-lbl">נרשמו מראש</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--green)" id="dbRegArrived">0</div><div class="stat-lbl">הגיעו</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--yellow)" id="dbRegPending">0</div><div class="stat-lbl">טרם הגיעו</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--green)" id="dbWalkin">0</div><div class="stat-lbl">פנוי להזדמנים</div></div>
+  </div>
+
+  <div class="section-title">סבבים</div>
+  <div id="dbSlots"></div>
+
+  <div class="section-title">אורחים נוכחים <span class="badge badge-green" id="dbActiveBadge">0</span></div>
+  <div id="dbActiveList"></div>
+
+  <div class="section-title">נרשמים מראש <span class="badge badge-blue" id="dbRegBadge">0</span></div>
+  <div id="dbRegList"></div>
+
+  <button class="collapsible-btn" onclick="toggleEl('dbHistory')">היסטוריית יציאות &#9660;</button>
+  <div class="collapsible" id="dbHistory"></div>
+
+  <div class="actions-row" style="margin-top:16px">
+    <button class="btn-sm blue" onclick="exportCSV()" style="flex:1;padding:12px;font-size:.85rem">&#128196; ייצוא CSV</button>
+  </div>
+</div>
+
+<!-- ==================== LIVE PAGE ==================== -->
+<!-- ==================== CLIENT VIEW (hidden by default, shown via ?client=TOKEN) ==================== -->
+<div id="clientView" style="display:none;padding:16px;padding-bottom:40px;min-height:100dvh">
+  <div style="text-align:center;padding:16px 0 6px">
+    <div style="font-size:.75rem;color:var(--muted);margin-bottom:4px">אירוע עבור</div>
+    <div style="font-size:1.2rem;font-weight:800" id="cvClientName"></div>
+  </div>
+  <div style="text-align:center;padding:10px 0 6px">
+    <div style="font-size:.85rem;font-weight:700">
+      מצב האירוע
+      <span style="display:inline-block;width:8px;height:8px;background:var(--green);border-radius:50%;margin-right:6px;animation:pulse 1.5s infinite"></span>
+    </div>
+    <div style="font-size:.7rem;color:var(--muted)">צפייה בלבד - מתעדכן בזמן אמת</div>
+  </div>
+  <div style="text-align:center;padding:10px 0">
+    <div class="live-ring">
+      <svg viewBox="0 0 200 200">
+        <circle class="bg-circle" cx="100" cy="100" r="88"/>
+        <circle class="prog-circle" id="cvCircle" cx="100" cy="100" r="88"/>
+      </svg>
+      <div class="live-inner">
+        <div class="live-number" id="cvCount">0</div>
+        <div class="live-label">נוכחים כרגע</div>
+        <div class="live-max">מתוך <span id="cvMax">50</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="status-msg status-ok" id="cvStatus" style="margin:0 16px 16px">ממתין לאורחים</div>
+  <div class="stats-row" style="padding:0 0 12px">
+    <div class="stat-card"><div class="stat-val" style="color:var(--green)" id="cvTotal">0</div><div class="stat-lbl">סה"כ ביקרו</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--blue)" id="cvRegTotal">0</div><div class="stat-lbl">נרשמו מראש</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--yellow)" id="cvRegPending">0</div><div class="stat-lbl">טרם הגיעו</div></div>
+  </div>
+  <div class="section-title">סבבים</div>
+  <div id="cvSlots"></div>
+  <div style="text-align:center;padding:24px 0;font-size:.7rem;color:var(--border)">Event Gate</div>
+</div>
+
+<div class="page" id="page-live">
+  <div style="text-align:center;padding:20px 0 10px">
+    <div style="font-size:.9rem;font-weight:700">
+      מצב האירוע
+      <span style="display:inline-block;width:8px;height:8px;background:var(--green);border-radius:50%;margin-right:6px;animation:pulse 1.5s infinite"></span>
+    </div>
+    <div style="font-size:.75rem;color:var(--muted)">מתעדכן בזמן אמת</div>
+  </div>
+
+  <div style="text-align:center;padding:10px 0">
+    <div class="live-ring">
+      <svg viewBox="0 0 200 200">
+        <circle class="bg-circle" cx="100" cy="100" r="88"/>
+        <circle class="prog-circle" id="liveCircle" cx="100" cy="100" r="88"/>
+      </svg>
+      <div class="live-inner">
+        <div class="live-number" id="liveCount">0</div>
+        <div class="live-label">נוכחים כרגע</div>
+        <div class="live-max">מתוך <span id="liveMax">50</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-msg status-ok" id="liveStatus" style="margin:0 0 16px">ממתין לאורחים</div>
+
+  <div class="section-title">סבבים</div>
+  <div id="liveSlots"></div>
+</div>
+
+<script>
+// ============================================================
+//  STATE MANAGEMENT
+// ============================================================
+const STORAGE_KEY = 'eventGateData';
+const CIRC = 2 * Math.PI * 88;
+let selectedRegSlot = -1;
+let ciGuestId = null;
+let ciCheckinTime = null;
+let ciTimerInterval = null;
+
+function defaultState() {
+  return {
+    configured: false,
+    maxCapacity: 50,
+    slotDurationMin: 30,
+    numSlots: 5,
+    startTime: null,
+    slots: [],
+    clientName: '',
+    clientToken: '',
+    guests: {},       // id -> {id,name,checkinTime,checkoutTime,type,regCode,slotIndex}
+    preRegs: {},      // code -> {code,name,phone,registeredAt,arrived,slotIndex}
+    nextGuestNum: 1,
+  };
+}
+
+let S = loadData();
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? { ...defaultState(), ...JSON.parse(raw) } : defaultState();
+  } catch { return defaultState(); }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(S));
+}
+
+// ============================================================
+//  HELPERS
+// ============================================================
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function formatHM(ts) {
+  return new Date(ts).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDur(ms) {
+  const m = Math.floor(ms / 60000) % 60;
+  const h = Math.floor(ms / 3600000);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')} שע'`;
+  const s = Math.floor(ms / 1000) % 60;
+  return `${m}:${String(s).padStart(2, '0')} דק'`;
+}
+
+function formatDurLong(ms) {
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return `${m} דקות`;
+  const h = Math.floor(m / 60);
+  return `${h} שעות ו-${m % 60} דקות`;
+}
+
+function randomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c = '';
+  for (let i = 0; i < 8; i++) c += chars[Math.floor(Math.random() * chars.length)];
+  return c;
+}
+
+function randomId() {
+  return Math.random().toString(36).slice(2, 14);
+}
+
+function activeGuests() {
+  return Object.values(S.guests).filter(g => !g.checkoutTime);
+}
+
+function historyGuests() {
+  return Object.values(S.guests).filter(g => g.checkoutTime).sort((a, b) => b.checkoutTime - a.checkoutTime);
+}
+
+function activeCount() {
+  return activeGuests().length;
+}
+
+function csvSafe(str) {
+  if (typeof str !== 'string') return str;
+  if (/^[=+\-@\t\r]/.test(str)) return "'" + str;
+  return str;
+}
+
+// ============================================================
+//  TOAST
+// ============================================================
+function showError(msg) {
+  const el = document.getElementById('errorToast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3500);
+}
+
+function showSuccess(msg) {
+  const el = document.getElementById('successToast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+
+// ============================================================
+//  NAVIGATION
+// ============================================================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+  const btn = document.querySelector(`.nav-btn[data-page="${name}"]`);
+  if (btn) btn.classList.add('active');
+  renderAll();
+}
+
+function toggleEl(id) {
+  document.getElementById(id).classList.toggle('show');
+}
+
+// ============================================================
+//  SETUP
+// ============================================================
+function initSetup() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('cfgClientName').value = S.clientName || '';
+  document.getElementById('cfgDate').value = S.startTime ? new Date(S.startTime).toISOString().split('T')[0] : today;
+  if (S.startTime) {
+    const d = new Date(S.startTime);
+    document.getElementById('cfgTime').value = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  document.getElementById('cfgSlots').value = S.numSlots;
+  document.getElementById('cfgDuration').value = S.slotDurationMin;
+  document.getElementById('cfgMax').value = S.maxCapacity;
+
+  ['cfgDate', 'cfgTime', 'cfgSlots', 'cfgDuration', 'cfgMax'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateSetupPreview);
+    document.getElementById(id).addEventListener('change', updateSetupPreview);
+  });
+  updateSetupPreview();
+}
+
+function updateSetupPreview() {
+  const date = document.getElementById('cfgDate').value;
+  const time = document.getElementById('cfgTime').value;
+  const ns = parseInt(document.getElementById('cfgSlots').value) || 0;
+  const dur = parseInt(document.getElementById('cfgDuration').value) || 30;
+  const mc = parseInt(document.getElementById('cfgMax').value) || 0;
+  const el = document.getElementById('setupPreview');
+
+  if (!date || !time || ns < 1) { el.innerHTML = ''; return; }
+  const start = new Date(`${date}T${time}`);
+  if (isNaN(start.getTime())) { el.innerHTML = ''; return; }
+
+  let html = '<div class="preview-box"><div style="font-weight:600;font-size:.85rem;margin-bottom:8px">תצוגה מקדימה</div>';
+  for (let i = 0; i < Math.min(ns, 20); i++) {
+    const ss = new Date(start.getTime() + i * dur * 60000);
+    const se = new Date(ss.getTime() + dur * 60000);
+    html += `<div class="preview-slot"><span class="ps-label">סבב ${i + 1}</span><span class="ps-time">${formatHM(ss)} - ${formatHM(se)}</span></div>`;
+  }
+  html += `<div class="preview-summary"><span>סה"כ אפשרי:</span><span class="total">${mc * ns} (${ns} x ${mc})</span></div></div>`;
+  el.innerHTML = html;
+}
+
+function saveSetup() {
+  const date = document.getElementById('cfgDate').value;
+  const time = document.getElementById('cfgTime').value;
+  const ns = parseInt(document.getElementById('cfgSlots').value);
+  const dur = parseInt(document.getElementById('cfgDuration').value);
+  const mc = parseInt(document.getElementById('cfgMax').value);
+
+  if (!date || !time) { showError('יש להזין תאריך ושעה'); return; }
+  if (!ns || ns < 1 || ns > 20) { showError('מספר סבבים: 1-20'); return; }
+  if (mc < 1 || mc > 1000) { showError('מספר משתתפים: 1-1000'); return; }
+
+  const start = new Date(`${date}T${time}`);
+  if (isNaN(start.getTime())) { showError('תאריך/שעה לא תקינים'); return; }
+
+  // If reconfiguring with existing data, confirm
+  if (S.configured && Object.keys(S.guests).length > 0) {
+    if (!confirm('שינוי ההגדרות ימחק את כל הנתונים הקיימים. להמשיך?')) return;
+    S.guests = {};
+    S.preRegs = {};
+    S.nextGuestNum = 1;
+  }
+
+  S.configured = true;
+  S.startTime = start.getTime();
+  S.numSlots = ns;
+  S.slotDurationMin = dur;
+  S.maxCapacity = mc;
+
+  // Client info
+  const clientName = document.getElementById('cfgClientName').value.trim().slice(0, 100);
+  S.clientName = clientName;
+  if (!S.clientToken) S.clientToken = randomCode();
+
+  S.slots = [];
+  for (let i = 0; i < ns; i++) {
+    const ss = start.getTime() + i * dur * 60000;
+    const se = ss + dur * 60000;
+    S.slots.push({ index: i, label: `${formatHM(ss)} - ${formatHM(se)}`, startTime: ss, endTime: se });
+  }
+
+  save();
+  updateClientLinkCard();
+  showSuccess(`האירוע הוגדר! ${ns} סבבים, עד ${mc} משתתפים`);
+  showPage('dashboard');
+}
+
+function resetAll() {
+  if (!confirm('למחוק את כל הנתונים? פעולה זו בלתי הפיכה!')) return;
+  if (!confirm('בטוח? הכל יימחק.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem('eventGateCheckin');
+  S = defaultState();
+  save();
+  ciGuestId = null;
+  ciCheckinTime = null;
+  showSuccess('כל הנתונים נמחקו');
+  initSetup();
+  renderAll();
+}
+
+// ============================================================
+//  REGISTER
+// ============================================================
+function renderRegister() {
+  if (!S.configured) {
+    document.getElementById('regFormSection').style.display = 'none';
+    document.getElementById('regSuccessSection').style.display = 'none';
+    document.getElementById('regNotConfigured').style.display = 'block';
+    return;
+  }
+  document.getElementById('regNotConfigured').style.display = 'none';
+  // Don't override success screen if showing
+  if (document.getElementById('regSuccessSection').style.display === 'block') return;
+  document.getElementById('regFormSection').style.display = 'block';
+
+  const regs = Object.values(S.preRegs);
+  const grid = document.getElementById('regSlotGrid');
+  grid.innerHTML = S.slots.map(slot => {
+    const count = regs.filter(r => r.slotIndex === slot.index).length;
+    const avail = S.maxCapacity - count;
+    const full = avail <= 0;
+    const pct = count / S.maxCapacity;
+    let cls = 'avail-ok', txt = `${avail} מקומות`;
+    if (full) { cls = 'avail-full'; txt = 'מלא'; }
+    else if (pct >= .8) { cls = 'avail-low'; txt = `${avail} אחרונים`; }
+
+    return `<div class="slot-option ${full ? 'full' : ''} ${selectedRegSlot === slot.index ? 'selected' : ''}" onclick="${full ? '' : `selectRegSlot(${slot.index})`}">
+      <div><div class="slot-time">${slot.label}</div><div class="slot-info">סבב ${slot.index + 1}</div></div>
+      <span class="slot-avail ${cls}">${txt}</span></div>`;
+  }).join('');
+}
+
+function selectRegSlot(i) { selectedRegSlot = i; renderRegister(); }
+
+function showRegForm() {
+  selectedRegSlot = -1;
+  document.getElementById('regName').value = '';
+  document.getElementById('regPhone').value = '';
+  document.getElementById('regSuccessSection').style.display = 'none';
+  document.getElementById('regFormSection').style.display = 'block';
+  renderRegister();
+}
+
+function doRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const phone = document.getElementById('regPhone').value.trim();
+  if (!name) { showError('נא להזין שם'); return; }
+  if (selectedRegSlot < 0) { showError('נא לבחור חלון זמן'); return; }
+
+  const regs = Object.values(S.preRegs);
+  const slotCount = regs.filter(r => r.slotIndex === selectedRegSlot).length;
+  if (slotCount >= S.maxCapacity) { showError('חלון הזמן הזה מלא'); renderRegister(); return; }
+
+  const code = randomCode();
+  S.preRegs[code] = {
+    code, name: name.slice(0, 100), phone: phone.slice(0, 20),
+    registeredAt: Date.now(), arrived: false, slotIndex: selectedRegSlot,
+  };
+  save();
+
+  const slot = S.slots[selectedRegSlot];
+  document.getElementById('regSuccessName').textContent = name;
+  document.getElementById('regSuccessSlot').textContent = `סבב ${selectedRegSlot + 1}: ${slot.label}`;
+  document.getElementById('regSuccessCode').textContent = code;
+  document.getElementById('regFormSection').style.display = 'none';
+  document.getElementById('regSuccessSection').style.display = 'block';
+  if (navigator.vibrate) navigator.vibrate(100);
+}
+
+// ============================================================
+//  CHECK-IN
+// ============================================================
+function showCheckinTab(tab) {
+  document.querySelectorAll('.checkin-tab').forEach((t, i) => t.classList.toggle('active', (tab === 'code' ? i === 0 : i === 1)));
+  document.querySelectorAll('.checkin-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+function restoreCheckin() {
+  try {
+    const raw = localStorage.getItem('eventGateCheckin');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d.id && S.guests[d.id] && !S.guests[d.id].checkoutTime) {
+      ciGuestId = d.id;
+      ciCheckinTime = d.checkinTime;
+      showCheckinActive(S.guests[d.id].name, S.guests[d.id].type);
+    }
+  } catch {}
+}
+
+function showCheckinActive(name, type) {
+  document.getElementById('checkinMain').style.display = 'none';
+  document.getElementById('checkinDone').style.display = 'none';
+  document.getElementById('checkinActive').style.display = 'block';
+  document.getElementById('ciActiveName').textContent = name;
+  document.getElementById('ciActiveBadge').innerHTML = type === 'preregistered'
+    ? '<span class="badge badge-blue">נרשם/ה מראש</span>'
+    : '<span class="badge badge-green">אורח/ת</span>';
+  startCiTimer();
+}
+
+function startCiTimer() {
+  if (ciTimerInterval) clearInterval(ciTimerInterval);
+  updateCiTimer();
+  ciTimerInterval = setInterval(updateCiTimer, 1000);
+}
+
+function updateCiTimer() {
+  if (!ciCheckinTime) return;
+  const el = document.getElementById('ciActiveTimer');
+  const elapsed = Date.now() - ciCheckinTime;
+  const m = Math.floor(elapsed / 60000) % 60;
+  const h = Math.floor(elapsed / 3600000);
+  const s = Math.floor(elapsed / 1000) % 60;
+  el.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function doCodeCheckin() {
+  if (!S.configured) { showError('האירוע טרם הוגדר'); return; }
+  const code = document.getElementById('ciCode').value.trim().toUpperCase();
+  if (!code) { showError('נא להזין קוד'); return; }
+
+  const reg = S.preRegs[code];
+  if (!reg) { showError('קוד הרשמה לא נמצא'); return; }
+  if (reg.arrived) { showError('כבר נרשם/ה כנוכח/ת'); return; }
+  if (activeCount() >= S.maxCapacity) { showError('האירוע מלא כרגע'); return; }
+
+  reg.arrived = true;
+  const id = randomId();
+  const now = Date.now();
+  S.guests[id] = { id, name: reg.name, checkinTime: now, checkoutTime: null, type: 'preregistered', regCode: code, slotIndex: reg.slotIndex };
+  save();
+
+  ciGuestId = id;
+  ciCheckinTime = now;
+  localStorage.setItem('eventGateCheckin', JSON.stringify({ id, checkinTime: now }));
+  document.getElementById('ciCode').value = '';
+  if (navigator.vibrate) navigator.vibrate(100);
+  showCheckinActive(reg.name, 'preregistered');
+  showSuccess(`${reg.name} נכנס/ה בהצלחה!`);
+}
+
+function doWalkinCheckin() {
+  if (!S.configured) { showError('האירוע טרם הוגדר'); return; }
+  const name = document.getElementById('ciName').value.trim();
+  if (!name) { showError('נא להזין שם'); return; }
+
+  const ac = activeCount();
+  const now = Date.now();
+  const pendingRegs = Object.values(S.preRegs).filter(r => {
+    if (r.arrived) return false;
+    const slot = S.slots[r.slotIndex];
+    return slot && now < slot.endTime;
+  }).length;
+
+  if (ac >= S.maxCapacity) { showError('האירוע מלא, יש להמתין ליציאת אורחים'); return; }
+  if (S.maxCapacity - ac - pendingRegs <= 0) { showError('המקומות שמורים לנרשמים מראש'); return; }
+
+  const id = randomId();
+  const currentSlot = S.slots.find(s => now >= s.startTime && now < s.endTime);
+  S.guests[id] = { id, name: name.slice(0, 100), checkinTime: now, checkoutTime: null, type: 'walkin', regCode: null, slotIndex: currentSlot ? currentSlot.index : -1 };
+  save();
+
+  ciGuestId = id;
+  ciCheckinTime = now;
+  localStorage.setItem('eventGateCheckin', JSON.stringify({ id, checkinTime: now }));
+  document.getElementById('ciName').value = '';
+  if (navigator.vibrate) navigator.vibrate(100);
+  showCheckinActive(name, 'walkin');
+  showSuccess(`${name} נכנס/ה בהצלחה!`);
+}
+
+function doCheckout() {
+  if (!ciGuestId || !S.guests[ciGuestId]) return;
+  const g = S.guests[ciGuestId];
+  g.checkoutTime = Date.now();
+  save();
+
+  const dur = g.checkoutTime - g.checkinTime;
+  document.getElementById('ciDoneDur').textContent = `שהיתם באירוע ${formatDurLong(dur)}`;
+  document.getElementById('checkinActive').style.display = 'none';
+  document.getElementById('checkinDone').style.display = 'block';
+  ciGuestId = null;
+  ciCheckinTime = null;
+  localStorage.removeItem('eventGateCheckin');
+  if (ciTimerInterval) { clearInterval(ciTimerInterval); ciTimerInterval = null; }
+  if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+}
+
+function resetCheckin() {
+  ciGuestId = null;
+  ciCheckinTime = null;
+  localStorage.removeItem('eventGateCheckin');
+  if (ciTimerInterval) { clearInterval(ciTimerInterval); ciTimerInterval = null; }
+  document.getElementById('checkinActive').style.display = 'none';
+  document.getElementById('checkinDone').style.display = 'none';
+  document.getElementById('checkinMain').style.display = 'block';
+  renderCheckin();
+}
+
+function renderCheckin() {
+  document.getElementById('ciCount').textContent = activeCount();
+  document.getElementById('ciMax').textContent = S.maxCapacity;
+}
+
+// ============================================================
+//  DASHBOARD
+// ============================================================
+function renderDashboard() {
+  // Client header
+  if (S.clientName) {
+    document.getElementById('dbClientHeader').style.display = 'block';
+    document.getElementById('dbClientName').textContent = S.clientName;
+  } else {
+    document.getElementById('dbClientHeader').style.display = 'none';
+  }
+
+  const ac = activeCount();
+  const hist = historyGuests();
+  const pct = ac / S.maxCapacity;
+  const now = Date.now();
+
+  let color;
+  if (pct >= 1) color = 'var(--red)';
+  else if (pct >= .9) color = 'var(--orange)';
+  else if (pct >= .7) color = 'var(--yellow)';
+  else color = 'var(--green)';
+
+  document.getElementById('dbCount').textContent = ac;
+  document.getElementById('dbCount').style.color = color;
+  document.getElementById('dbMax').textContent = S.maxCapacity;
+
+  const fill = document.getElementById('dbFill');
+  fill.style.width = Math.min(pct * 100, 100) + '%';
+  fill.style.background = color;
+
+  const statusEl = document.getElementById('dbStatus');
+  const rem = S.maxCapacity - ac;
+  statusEl.className = 'status-msg';
+  if (ac >= S.maxCapacity) { statusEl.classList.add('status-full'); statusEl.textContent = 'האירוע מלא!'; }
+  else if (pct >= .9) { statusEl.classList.add('status-danger'); statusEl.textContent = `נותרו ${rem} מקומות בלבד!`; }
+  else if (pct >= .7) { statusEl.classList.add('status-warn'); statusEl.textContent = `נותרו ${rem} מקומות`; }
+  else if (ac === 0) { statusEl.classList.add('status-ok'); statusEl.textContent = 'ממתין לאורחים'; }
+  else { statusEl.classList.add('status-ok'); statusEl.textContent = `${rem} מקומות פנויים`; }
+
+  // Stats
+  const totalGuests = Object.keys(S.guests).length;
+  document.getElementById('dbTotal').textContent = totalGuests;
+  document.getElementById('dbOut').textContent = hist.length;
+  if (hist.length > 0) {
+    const avg = hist.reduce((s, g) => s + (g.checkoutTime - g.checkinTime), 0) / hist.length;
+    document.getElementById('dbAvg').textContent = formatDur(avg);
+  } else {
+    document.getElementById('dbAvg').textContent = '-';
+  }
+
+  const regs = Object.values(S.preRegs);
+  const regArrived = regs.filter(r => r.arrived).length;
+  const regPending = regs.length - regArrived;
+  const walkinAvail = Math.max(0, S.maxCapacity - ac - regPending);
+  document.getElementById('dbRegTotal').textContent = regs.length;
+  document.getElementById('dbRegArrived').textContent = regArrived;
+  document.getElementById('dbRegPending').textContent = regPending;
+  document.getElementById('dbWalkin').textContent = walkinAvail;
+  document.getElementById('dbActiveBadge').textContent = ac;
+  document.getElementById('dbRegBadge').textContent = regs.length;
+
+  // Slots
+  const slotsEl = document.getElementById('dbSlots');
+  if (S.slots.length === 0) {
+    slotsEl.innerHTML = '<div class="empty-msg">אין סבבים</div>';
+  } else {
+    let currentSlotIdx = -1;
+    for (const slot of S.slots) {
+      if (now >= slot.startTime && now < slot.endTime) { currentSlotIdx = slot.index; break; }
+    }
+    slotsEl.innerHTML = S.slots.map(slot => {
+      const isCurrent = currentSlotIdx === slot.index;
+      const isPast = now >= slot.endTime;
+      const isFuture = now < slot.startTime;
+      const slotRegs = regs.filter(r => r.slotIndex === slot.index);
+      const regPctSlot = Math.min(slotRegs.length / S.maxCapacity * 100, 100);
+      let barColor = 'var(--green)';
+      if (regPctSlot >= 90) barColor = 'var(--red)';
+      else if (regPctSlot >= 70) barColor = 'var(--yellow)';
+      let cls = '';
+      if (isCurrent) cls = 'slot-active';
+      else if (isPast) cls = 'slot-past';
+      else if (isFuture) cls = 'slot-future';
+      return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}</div><div class="slot-bar-wrap"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div></div></div><span style="color:var(--muted);font-size:.8rem">${slotRegs.length}/${S.maxCapacity}</span></div>`;
+    }).join('');
+  }
+
+  // Active guests
+  const activeList = document.getElementById('dbActiveList');
+  const active = activeGuests().sort((a, b) => a.checkinTime - b.checkinTime);
+  if (active.length === 0) {
+    activeList.innerHTML = '<div class="empty-msg">אין אורחים כרגע</div>';
+  } else {
+    activeList.innerHTML = active.map(g => {
+      const dur = now - g.checkinTime;
+      const durCls = dur > 7200000 ? 'dur-long' : dur > 3600000 ? 'dur-warn' : '';
+      const isPre = g.type === 'preregistered';
+      return `<div class="guest-card ${isPre ? 'prereg' : ''}"><div><div class="guest-name">${esc(g.name)} <span class="type-tag ${isPre ? 'tag-prereg' : 'tag-walkin'}">${isPre ? 'מראש' : 'הזדמן'}</span></div><div class="guest-sub">נכנס/ה ב-${formatHM(g.checkinTime)}</div></div><div class="guest-right"><div class="guest-dur ${durCls}" data-ci="${g.checkinTime}">${formatDur(dur)}</div><button class="btn-sm orange" onclick="adminCheckout('${g.id}')">הוצא</button></div></div>`;
+    }).join('');
+  }
+
+  // Pre-registration list
+  const regList = document.getElementById('dbRegList');
+  if (regs.length === 0) {
+    regList.innerHTML = '<div class="empty-msg">אין נרשמים מראש</div>';
+  } else {
+    const sorted = [...regs].sort((a, b) => {
+      if (a.slotIndex !== b.slotIndex) return a.slotIndex - b.slotIndex;
+      if (a.arrived && !b.arrived) return -1;
+      if (!a.arrived && b.arrived) return 1;
+      return a.registeredAt - b.registeredAt;
+    });
+    regList.innerHTML = sorted.map(r => {
+      const slot = S.slots[r.slotIndex];
+      const slotLbl = slot ? `סבב ${r.slotIndex + 1} (${slot.label})` : '';
+      if (r.arrived) {
+        const guest = Object.values(S.guests).find(g => g.regCode === r.code);
+        let statusTag, durHtml = '';
+        if (guest && !guest.checkoutTime) {
+          const dur = now - guest.checkinTime;
+          const durCls = dur > 7200000 ? 'dur-long' : dur > 3600000 ? 'dur-warn' : '';
+          durHtml = `<div class="guest-dur ${durCls}" data-ci="${guest.checkinTime}">${formatDur(dur)}</div>`;
+          statusTag = '<span class="type-tag" style="background:rgba(34,197,94,.12);color:var(--green)">באירוע</span>';
+        } else if (guest && guest.checkoutTime) {
+          durHtml = `<div class="guest-dur" style="opacity:.5">${formatDur(guest.checkoutTime - guest.checkinTime)}</div>`;
+          statusTag = '<span class="type-tag tag-out">עזב/ה</span>';
+        } else {
+          statusTag = '<span class="type-tag" style="background:rgba(34,197,94,.12);color:var(--green)">הגיע/ה</span>';
+        }
+        return `<div class="guest-card prereg"><div><div class="guest-name">${esc(r.name)} ${statusTag}</div><div class="guest-sub">${slotLbl}${r.phone ? ' | ' + esc(r.phone) : ''}</div></div><div class="guest-right">${durHtml}</div></div>`;
+      } else {
+        return `<div class="guest-card pending"><div><div class="guest-name">${esc(r.name)} <span class="type-tag tag-pending">טרם הגיע/ה</span></div><div class="guest-sub">${slotLbl}${r.phone ? ' | ' + esc(r.phone) : ''}</div></div><div class="guest-right"><span style="font-size:.65rem;color:var(--muted);direction:ltr">${r.code}</span> <button class="btn-sm red" onclick="releaseReg('${r.code}')">שחרר</button></div></div>`;
+      }
+    }).join('');
+  }
+
+  // History
+  const histEl = document.getElementById('dbHistory');
+  if (hist.length === 0) {
+    histEl.innerHTML = '<div class="empty-msg">אין היסטוריה</div>';
+  } else {
+    histEl.innerHTML = hist.slice(0, 50).map(g => {
+      const isPre = g.type === 'preregistered';
+      return `<div class="guest-card out"><div><div class="guest-name">${esc(g.name)} <span class="type-tag ${isPre ? 'tag-prereg' : 'tag-walkin'}">${isPre ? 'מראש' : 'הזדמן'}</span></div><div class="guest-sub">${formatHM(g.checkinTime)} &rarr; ${formatHM(g.checkoutTime)}</div></div><div class="guest-dur">${formatDur(g.checkoutTime - g.checkinTime)}</div></div>`;
+    }).join('');
+  }
+}
+
+function adminCheckout(id) {
+  if (!confirm('להוציא את האורח?')) return;
+  const g = S.guests[id];
+  if (!g || g.checkoutTime) return;
+  g.checkoutTime = Date.now();
+  save();
+  renderAll();
+}
+
+function releaseReg(code) {
+  if (!confirm('לשחרר את המקום?')) return;
+  const r = S.preRegs[code];
+  if (!r || r.arrived) return;
+  delete S.preRegs[code];
+  save();
+  renderAll();
+}
+
+// ============================================================
+//  LIVE
+// ============================================================
+function renderLive() {
+  const ac = activeCount();
+  const pct = ac / S.maxCapacity;
+  const offset = CIRC - (pct * CIRC);
+  const now = Date.now();
+
+  const circle = document.getElementById('liveCircle');
+  circle.style.strokeDasharray = CIRC;
+  circle.style.strokeDashoffset = offset;
+
+  let color;
+  if (pct >= 1) color = 'var(--red)';
+  else if (pct >= .9) color = 'var(--orange)';
+  else if (pct >= .7) color = 'var(--yellow)';
+  else color = 'var(--green)';
+  circle.style.stroke = color;
+
+  document.getElementById('liveCount').textContent = ac;
+  document.getElementById('liveCount').style.color = color;
+  document.getElementById('liveMax').textContent = S.maxCapacity;
+
+  const statusEl = document.getElementById('liveStatus');
+  const rem = S.maxCapacity - ac;
+  statusEl.className = 'status-msg';
+  if (ac >= S.maxCapacity) { statusEl.classList.add('status-full'); statusEl.textContent = 'האירוע מלא כרגע'; }
+  else if (pct >= .9) { statusEl.classList.add('status-danger'); statusEl.textContent = `נותרו ${rem} מקומות בלבד!`; }
+  else if (pct >= .7) { statusEl.classList.add('status-warn'); statusEl.textContent = `נותרו ${rem} מקומות`; }
+  else if (ac === 0) { statusEl.classList.add('status-ok'); statusEl.textContent = 'ממתין לאורחים'; }
+  else { statusEl.classList.add('status-ok'); statusEl.textContent = `${rem} מקומות פנויים`; }
+
+  const regs = Object.values(S.preRegs);
+  let currentSlotIdx = -1;
+  for (const slot of S.slots) {
+    if (now >= slot.startTime && now < slot.endTime) { currentSlotIdx = slot.index; break; }
+  }
+
+  const slotsEl = document.getElementById('liveSlots');
+  slotsEl.innerHTML = S.slots.map(slot => {
+    const isCurrent = currentSlotIdx === slot.index;
+    const isPast = now >= slot.endTime;
+    const slotRegs = regs.filter(r => r.slotIndex === slot.index);
+    const regPctSlot = Math.min(slotRegs.length / S.maxCapacity * 100, 100);
+    let barColor = 'var(--green)';
+    if (regPctSlot >= 90) barColor = 'var(--red)';
+    else if (regPctSlot >= 70) barColor = 'var(--yellow)';
+    let cls = '';
+    if (isCurrent) cls = 'slot-active';
+    else if (isPast) cls = 'slot-past';
+    return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}</div><div class="slot-bar-wrap"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div></div></div><span style="color:var(--muted);font-size:.8rem">${slotRegs.length}/${S.maxCapacity}</span></div>`;
+  }).join('');
+}
+
+// ============================================================
+//  CSV EXPORT
+// ============================================================
+function exportCSV() {
+  const now = Date.now();
+  const bom = '\uFEFF';
+  let csv = bom + 'שם,סוג,סבב,כניסה,יציאה,משך (דקות),סטטוס\n';
+
+  activeGuests().forEach(g => {
+    const dur = Math.round((now - g.checkinTime) / 60000);
+    const type = g.type === 'preregistered' ? 'מראש' : 'הזדמן';
+    const slot = g.slotIndex >= 0 ? `סבב ${g.slotIndex + 1}` : '-';
+    csv += `"${csvSafe(g.name)}",${type},${slot},${formatHM(g.checkinTime)},,${dur},נוכח\n`;
+  });
+
+  historyGuests().forEach(g => {
+    const dur = Math.round((g.checkoutTime - g.checkinTime) / 60000);
+    const type = g.type === 'preregistered' ? 'מראש' : 'הזדמן';
+    const slot = g.slotIndex >= 0 ? `סבב ${g.slotIndex + 1}` : '-';
+    csv += `"${csvSafe(g.name)}",${type},${slot},${formatHM(g.checkinTime)},${formatHM(g.checkoutTime)},${dur},יצא\n`;
+  });
+
+  Object.values(S.preRegs).filter(r => !r.arrived).forEach(r => {
+    const slot = `סבב ${r.slotIndex + 1}`;
+    csv += `"${csvSafe(r.name)}",מראש,${slot},,,0,לא הגיע\n`;
+  });
+
+  csv += `\nסיכום\nסה"כ ביקרו,${Object.keys(S.guests).length}\nנוכחים כרגע,${activeCount()}\nנרשמו מראש,${Object.keys(S.preRegs).length}\n`;
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `דוח_אירוע_${new Date().toLocaleDateString('he-IL').replace(/\./g, '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showSuccess('הקובץ הורד בהצלחה');
+}
+
+// ============================================================
+//  RENDER ALL & TIMER
+// ============================================================
+function renderAll() {
+  renderCheckin();
+  renderDashboard();
+  renderLive();
+  renderRegister();
+}
+
+function updateDurations() {
+  const now = Date.now();
+  document.querySelectorAll('.guest-dur[data-ci]').forEach(el => {
+    const ci = parseInt(el.dataset.ci);
+    const dur = now - ci;
+    el.textContent = formatDur(dur);
+    el.classList.remove('dur-warn', 'dur-long');
+    if (dur > 7200000) el.classList.add('dur-long');
+    else if (dur > 3600000) el.classList.add('dur-warn');
+  });
+}
+
+// ============================================================
+//  CLIENT VIEW
+// ============================================================
+function updateClientLinkCard() {
+  const card = document.getElementById('clientLinkCard');
+  if (S.configured && S.clientToken) {
+    const base = window.location.origin + window.location.pathname;
+    const url = `${base}?client=${S.clientToken}`;
+    document.getElementById('clientLinkUrl').textContent = url;
+    document.getElementById('clientLinkName').textContent = S.clientName || 'לא הוגדר';
+    card.style.display = 'block';
+  } else {
+    card.style.display = 'none';
+  }
+}
+
+function copyClientLink() {
+  const url = document.getElementById('clientLinkUrl').textContent;
+  navigator.clipboard.writeText(url).then(() => showSuccess('קישור הלקוח הועתק!'));
+}
+
+function renderClientView() {
+  const ac = activeCount();
+  const pct = ac / S.maxCapacity;
+  const offset = CIRC - (pct * CIRC);
+  const now = Date.now();
+
+  const circle = document.getElementById('cvCircle');
+  circle.style.strokeDasharray = CIRC;
+  circle.style.strokeDashoffset = offset;
+
+  let color;
+  if (pct >= 1) color = 'var(--red)';
+  else if (pct >= .9) color = 'var(--orange)';
+  else if (pct >= .7) color = 'var(--yellow)';
+  else color = 'var(--green)';
+  circle.style.stroke = color;
+
+  document.getElementById('cvCount').textContent = ac;
+  document.getElementById('cvCount').style.color = color;
+  document.getElementById('cvMax').textContent = S.maxCapacity;
+  document.getElementById('cvClientName').textContent = S.clientName || 'האירוע';
+
+  // Stats
+  document.getElementById('cvTotal').textContent = Object.keys(S.guests).length;
+  const regs = Object.values(S.preRegs);
+  document.getElementById('cvRegTotal').textContent = regs.length;
+  document.getElementById('cvRegPending').textContent = regs.filter(r => !r.arrived).length;
+
+  // Status
+  const statusEl = document.getElementById('cvStatus');
+  const rem = S.maxCapacity - ac;
+  statusEl.className = 'status-msg';
+  if (ac >= S.maxCapacity) { statusEl.classList.add('status-full'); statusEl.textContent = 'האירוע מלא כרגע'; }
+  else if (pct >= .9) { statusEl.classList.add('status-danger'); statusEl.textContent = `נותרו ${rem} מקומות בלבד!`; }
+  else if (pct >= .7) { statusEl.classList.add('status-warn'); statusEl.textContent = `נותרו ${rem} מקומות`; }
+  else if (ac === 0) { statusEl.classList.add('status-ok'); statusEl.textContent = 'ממתין לאורחים'; }
+  else { statusEl.classList.add('status-ok'); statusEl.textContent = `${rem} מקומות פנויים`; }
+
+  // Slots
+  let currentSlotIdx = -1;
+  for (const slot of S.slots) {
+    if (now >= slot.startTime && now < slot.endTime) { currentSlotIdx = slot.index; break; }
+  }
+  const slotsEl = document.getElementById('cvSlots');
+  slotsEl.innerHTML = S.slots.map(slot => {
+    const isCurrent = currentSlotIdx === slot.index;
+    const isPast = now >= slot.endTime;
+    const slotRegs = regs.filter(r => r.slotIndex === slot.index);
+    const regPctSlot = Math.min(slotRegs.length / S.maxCapacity * 100, 100);
+    let barColor = 'var(--green)';
+    if (regPctSlot >= 90) barColor = 'var(--red)';
+    else if (regPctSlot >= 70) barColor = 'var(--yellow)';
+    let cls = '';
+    if (isCurrent) cls = 'slot-active';
+    else if (isPast) cls = 'slot-past';
+    return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}</div><div class="slot-bar-wrap"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div></div></div><span style="color:var(--muted);font-size:.8rem">${slotRegs.length}/${S.maxCapacity}</span></div>`;
+  }).join('');
+}
+
+let isClientMode = false;
+
+function enterClientMode() {
+  isClientMode = true;
+  document.querySelector('.nav').style.display = 'none';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('clientView').style.display = 'block';
+  renderClientView();
+  // Refresh from localStorage every 2 seconds to pick up changes from admin's device
+  setInterval(() => {
+    S = loadData();
+    renderClientView();
+  }, 2000);
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+// Check for client mode first
+const urlClientToken = new URLSearchParams(window.location.search).get('client');
+if (urlClientToken && S.clientToken && urlClientToken === S.clientToken) {
+  enterClientMode();
+} else {
+  initSetup();
+  updateClientLinkCard();
+  restoreCheckin();
+  renderAll();
+}
+
+if (!isClientMode) {
+  // Auto-update durations and re-render every second
+  setInterval(() => {
+    updateDurations();
+    renderCheckin();
+  }, 1000);
+
+  // Full re-render every 10 seconds
+  setInterval(renderAll, 10000);
+
+  // Enter key handlers
+  document.getElementById('ciCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+  document.getElementById('ciCode').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doCodeCheckin(); } });
+  document.getElementById('ciName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doWalkinCheckin(); } });
+  document.getElementById('regName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('regPhone').focus(); } });
+  document.getElementById('regPhone').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doRegister(); } });
+
+  // Hash routing
+  function handleHash() {
+    const hash = window.location.hash.replace('#', '');
+    if (['setup', 'register', 'checkin', 'dashboard', 'live'].includes(hash)) {
+      showPage(hash);
+    }
+  }
+  window.addEventListener('hashchange', handleHash);
+  if (window.location.hash) handleHash();
+}
+</script>
+</body>
+</html>
