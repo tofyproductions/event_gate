@@ -1598,6 +1598,10 @@ function deleteEvent(id) {
   const reg = loadRegistry().filter(e => e.id !== id);
   saveRegistry(reg);
   if (activeEventId === id) { activeEventId = null; S = defaultState(); }
+  // Delete from server
+  if (apiToken) {
+    fetch('/api/events/' + id, { method: 'DELETE', headers: { 'x-admin-token': apiToken } }).catch(() => {});
+  }
   showSuccess('האירוע נמחק');
   renderHome();
 }
