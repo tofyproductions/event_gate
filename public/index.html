@@ -787,12 +787,58 @@
       </div>
     </div>
 
-    <!-- Current count mini -->
-    <div class="card" style="text-align:center">
-      <span style="font-size:2rem;font-weight:800" id="ciCount">0</span>
-      <span style="color:var(--muted)"> / </span>
-      <span id="ciMax">50</span>
-      <div style="font-size:.8rem;color:var(--muted)">נוכחים כרגע</div>
+    <!-- ===== COMMAND BAR ===== -->
+    <div id="ciCommandBar" style="background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(168,85,247,.08));border:1px solid var(--border);border-radius:16px;padding:14px;margin-top:12px">
+      <!-- Live counter -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:10px">
+        <div style="text-align:center">
+          <div style="font-size:2.5rem;font-weight:900;line-height:1" id="ciCount">0</div>
+          <div style="font-size:.7rem;color:var(--muted)">נוכחים</div>
+        </div>
+        <div style="font-size:1.5rem;color:var(--border)">/</div>
+        <div style="text-align:center">
+          <div style="font-size:2.5rem;font-weight:900;line-height:1;color:var(--muted)" id="ciMax">50</div>
+          <div style="font-size:.7rem;color:var(--muted)">מקסימום</div>
+        </div>
+      </div>
+      <!-- Capacity bar -->
+      <div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-bottom:10px">
+        <div id="ciCapacityBar" style="height:100%;width:0%;border-radius:4px;transition:width .5s,background .3s;background:var(--green)"></div>
+      </div>
+      <!-- Status -->
+      <div id="ciStatusMsg" style="text-align:center;font-size:.85rem;font-weight:700;color:var(--green);margin-bottom:10px">ממתין לאורחים</div>
+      <!-- Stats grid -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+        <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:800;color:var(--green)" id="ciStatActive">0</div>
+          <div style="font-size:.6rem;color:var(--muted)">נוכחים</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:800;color:var(--blue)" id="ciStatRegs">0</div>
+          <div style="font-size:.6rem;color:var(--muted)">נרשמו</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:800;color:var(--yellow)" id="ciStatPending">0</div>
+          <div style="font-size:.6rem;color:var(--muted)">טרם הגיעו</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:800;color:var(--orange)" id="ciStatWalkin">0</div>
+          <div style="font-size:.6rem;color:var(--muted)">מזדמנים</div>
+        </div>
+      </div>
+      <!-- Active slot indicator -->
+      <div id="ciActiveSlot" style="text-align:center;font-size:.75rem;color:var(--muted);padding:4px;background:var(--bg);border-radius:8px;display:none">
+        <span id="ciActiveSlotText"></span>
+      </div>
+    </div>
+
+    <!-- Active guests quick list -->
+    <div style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:700;font-size:.85rem">אורחים נוכחים</span>
+        <span class="badge badge-green" id="ciGuestCount">0</span>
+      </div>
+      <div id="ciActiveGuests" style="max-height:200px;overflow-y:auto"></div>
     </div>
   </div>
 
@@ -2202,6 +2248,21 @@ function doWalkinCheckin() {
   showSuccess(`${name} נכנס/ה בהצלחה!`);
 }
 
+function quickCheckout(guestId) {
+  const g = S.guests[guestId];
+  if (!g) return;
+  g.checkoutTime = Date.now();
+  save();
+  if (apiToken) {
+    fetch('/api/events/' + activeEventId + '/checkout/' + guestId, {
+      method: 'POST', headers: { 'x-admin-token': apiToken }
+    }).catch(() => {});
+  }
+  showSuccess(`${g.name} יצא/ה מהאירוע`);
+  renderCheckin();
+  renderAll();
+}
+
 function doCheckout() {
   if (!ciGuestId || !S.guests[ciGuestId]) return;
   const g = S.guests[ciGuestId];
@@ -2238,8 +2299,96 @@ function resetCheckin() {
 }
 
 function renderCheckin() {
-  document.getElementById('ciCount').textContent = activeCount();
-  document.getElementById('ciMax').textContent = S.maxCapacity;
+  const ac = activeCount();
+  const max = S.maxCapacity || 50;
+  const pct = Math.round(ac / max * 100);
+
+  document.getElementById('ciCount').textContent = ac;
+  document.getElementById('ciCount').style.color = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--orange)' : pct >= 60 ? 'var(--yellow)' : 'var(--green)';
+  document.getElementById('ciMax').textContent = max;
+
+  // Capacity bar
+  const bar = document.getElementById('ciCapacityBar');
+  if (bar) {
+    bar.style.width = Math.min(pct, 100) + '%';
+    bar.style.background = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--orange)' : pct >= 60 ? 'var(--yellow)' : 'var(--green)';
+  }
+
+  // Status message
+  const statusEl = document.getElementById('ciStatusMsg');
+  if (statusEl) {
+    const rem = max - ac;
+    if (ac >= max) { statusEl.textContent = '⛔ האירוע מלא!'; statusEl.style.color = 'var(--red)'; }
+    else if (pct >= 80) { statusEl.textContent = `⚠️ נותרו ${rem} מקומות בלבד!`; statusEl.style.color = 'var(--orange)'; }
+    else if (ac === 0) { statusEl.textContent = '✅ ממתין לאורחים'; statusEl.style.color = 'var(--green)'; }
+    else { statusEl.textContent = `✅ ${rem} מקומות פנויים`; statusEl.style.color = 'var(--green)'; }
+  }
+
+  // Stats
+  const regs = Object.values(S.preRegs || {});
+  const guests = Object.values(S.guests || {});
+  const el = (id) => document.getElementById(id);
+  if (el('ciStatActive')) el('ciStatActive').textContent = ac;
+  if (el('ciStatRegs')) el('ciStatRegs').textContent = regs.reduce((s,r) => s + (r.participants||1), 0);
+  if (el('ciStatPending')) el('ciStatPending').textContent = regs.filter(r => !r.arrived).reduce((s,r) => s + (r.participants||1), 0);
+  if (el('ciStatWalkin')) el('ciStatWalkin').textContent = guests.filter(g => !g.checkoutTime && g.type === 'walkin').reduce((s,g) => s + (g.groupSize||1), 0);
+
+  // Active slot indicator
+  const now = Date.now();
+  const activeSlotEl = document.getElementById('ciActiveSlot');
+  const activeSlotText = document.getElementById('ciActiveSlotText');
+  if (activeSlotEl && S.slots) {
+    const currentSlot = S.slots.find(sl => now >= sl.startTime && now < sl.endTime);
+    if (currentSlot) {
+      activeSlotEl.style.display = 'block';
+      activeSlotEl.style.background = 'rgba(34,197,94,.1)';
+      activeSlotEl.style.border = '1px solid rgba(34,197,94,.3)';
+      activeSlotText.innerHTML = `🟢 <strong>סבב ${currentSlot.index + 1} פעיל</strong> | ${currentSlot.label}`;
+    } else {
+      const nextSlot = S.slots.find(sl => now < sl.startTime);
+      if (nextSlot) {
+        activeSlotEl.style.display = 'block';
+        activeSlotEl.style.background = 'rgba(59,130,246,.1)';
+        activeSlotEl.style.border = '1px solid rgba(59,130,246,.3)';
+        const minToNext = Math.ceil((nextSlot.startTime - now) / 60000);
+        activeSlotText.innerHTML = `🔵 סבב ${nextSlot.index + 1} מתחיל בעוד ${minToNext} דקות`;
+      } else {
+        activeSlotEl.style.display = 'block';
+        activeSlotEl.style.background = 'rgba(148,163,184,.1)';
+        activeSlotEl.style.border = '1px solid var(--border)';
+        activeSlotText.innerHTML = '⚫ כל הסבבים הסתיימו';
+      }
+    }
+  }
+
+  // Active guests list
+  const guestsEl = document.getElementById('ciActiveGuests');
+  const guestCountEl = document.getElementById('ciGuestCount');
+  if (guestsEl) {
+    const active = guests.filter(g => !g.checkoutTime).sort((a,b) => b.checkinTime - a.checkinTime);
+    if (guestCountEl) guestCountEl.textContent = active.length;
+    if (active.length === 0) {
+      guestsEl.innerHTML = '<div class="empty-msg" style="padding:12px;font-size:.8rem">אין אורחים כרגע</div>';
+    } else {
+      guestsEl.innerHTML = active.map(g => {
+        const dur = now - g.checkinTime;
+        const durStr = formatDur(dur);
+        const gs = g.groupSize > 1 ? ` (${g.groupSize})` : '';
+        const slot = g.slotIndex >= 0 && S.slots && S.slots[g.slotIndex] ? S.slots[g.slotIndex] : null;
+        const overSlot = slot && now >= slot.endTime;
+        const borderColor = overSlot ? 'border-right:3px solid var(--red)' : 'border-right:3px solid var(--green)';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg);border-radius:8px;margin-bottom:4px;font-size:.75rem;${borderColor}">
+          <div>
+            <strong>${esc(g.name)}${gs}</strong>
+            <span style="color:var(--muted);margin-right:6px">${durStr}</span>
+            ${overSlot ? '<span style="color:var(--red);font-weight:700">⏰ חריגה!</span>' : ''}
+          </div>
+          <button class="btn-sm red" onclick="quickCheckout('${g.id}')" style="padding:3px 8px;font-size:.65rem">הוצא</button>
+        </div>`;
+      }).join('');
+    }
+  }
+
   populateCheckinEventSelector();
   updateQrCode();
 }
