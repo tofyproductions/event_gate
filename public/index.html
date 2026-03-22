@@ -1481,9 +1481,9 @@ function renderHomeList(el, reg) {
 
   function renderEventCard(ev, status) {
     const data = loadData(ev.id);
-    const ac = Object.values(data.guests).filter(g => !g.checkoutTime).length;
-    const totalGuests = Object.keys(data.guests).length;
-    const totalRegs = Object.keys(data.preRegs).length;
+    const ac = Object.values(data.guests).filter(g => !g.checkoutTime).reduce((sum, g) => sum + (g.groupSize || 1), 0);
+    const totalGuests = Object.values(data.guests).reduce((sum, g) => sum + (g.groupSize || 1), 0);
+    const totalRegs = Object.values(data.preRegs).reduce((sum, r) => sum + (r.participants || 1), 0);
     const dateStr = ev.date || '';
     const evTitle = ev.eventName ? `${esc(ev.eventName)} \u2014 ${esc(ev.clientName || '')}` : esc(ev.clientName || '\u05dc\u05dc\u05d0 \u05e9\u05dd');
     const statusBadge = status === 'today' ? '<span class="badge badge-green" style="font-size:.65rem;margin-right:6px">\ud83d\udfe2 \u05d4\u05d9\u05d5\u05dd</span>' :
@@ -1618,7 +1618,7 @@ function buildClientMsg(data, ev, base) {
   if (clientUrl) msg += `📊 צפייה בלייב: ${clientUrl}\n`;
   msg += `📝 הרשמה למשתתפים: ${regUrl}\n`;
   msg += `\n━━━━━━━━━━━━━━━━\n`;
-  msg += `🌈 *טופי* - הפקות אירועים\nחברים של טופי בע״מ`;
+  msg += `🌈 *חברים של טופי בע״מ*`;
   return msg;
 }
 
@@ -1656,7 +1656,7 @@ function waQuickStaff(eventId) {
   let msg = '\ud83d\udccb *עמדת כניסה* - ' + evTitle + '\n';
   msg += '\nקישור לניהול כניסות:\n' + checkinUrl;
   msg += '\n\nהנחיות:\n- בדקו קוד מנרשמים מראש\n- מזדמנים: הזינו שם והכניסו\n- עקבו אחרי המונה';
-  msg += '\n\n\ud83c\udf08 *טופי* - הפקות אירועים';
+  msg += '\n\n\ud83c\udf08 *חברים של טופי בע״מ*';
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -1671,7 +1671,7 @@ function waQuickQR(eventId) {
   const evTitle = data.eventName || data.clientName || 'אירוע';
   let msg = '\ud83d\udcf1 *קישור כניסה מהירה* - ' + evTitle + '\n';
   msg += '\nמשתתפים מזדמנים סורקים את הקישור או נכנסים דרכו:\n' + qrUrl;
-  msg += '\n\n\ud83c\udf08 *טופי* - הפקות אירועים';
+  msg += '\n\n\ud83c\udf08 *חברים של טופי בע״מ*';
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -2386,8 +2386,8 @@ function renderDashboard() {
   else if (ac === 0) { statusEl.classList.add('status-ok'); statusEl.textContent = 'ממתין לאורחים'; }
   else { statusEl.classList.add('status-ok'); statusEl.textContent = `${rem} מקומות פנויים`; }
 
-  // Stats
-  const totalGuests = Object.keys(S.guests).length;
+  // Stats — count total participants (groupSize), not just entries
+  const totalGuests = Object.values(S.guests).reduce((sum, g) => sum + (g.groupSize || 1), 0);
   document.getElementById('dbTotal').textContent = totalGuests;
   if (hist.length > 0) {
     const avg = hist.reduce((s, g) => s + (g.checkoutTime - g.checkinTime), 0) / hist.length;
@@ -2417,7 +2417,10 @@ function renderDashboard() {
       const isPast = now >= slot.endTime;
       const isFuture = now < slot.startTime;
       const slotRegs = regs.filter(r => r.slotIndex === slot.index);
-      const regPctSlot = Math.min(slotRegs.length / S.maxCapacity * 100, 100);
+      const slotParticipants = slotRegs.reduce((sum, r) => sum + (r.participants || 1), 0);
+      const slotActiveGuests = Object.values(S.guests).filter(g => !g.checkoutTime && g.slotIndex === slot.index).reduce((sum, g) => sum + (g.groupSize || 1), 0);
+      const regPctSlot = Math.min(slotParticipants / S.maxCapacity * 100, 100);
+      const activePctSlot = Math.min(slotActiveGuests / S.maxCapacity * 100, 100);
       let barColor = 'var(--green)';
       if (regPctSlot >= 90) barColor = 'var(--red)';
       else if (regPctSlot >= 70) barColor = 'var(--yellow)';
@@ -2425,7 +2428,8 @@ function renderDashboard() {
       if (isCurrent) cls = 'slot-active';
       else if (isPast) cls = 'slot-past';
       else if (isFuture) cls = 'slot-future';
-      return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}</div><div class="slot-bar-wrap"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div></div></div><span style="color:var(--muted);font-size:.8rem">${slotRegs.length}/${S.maxCapacity}</span></div>`;
+      const activeLabel = slotActiveGuests > 0 ? `<span style="color:var(--green);font-weight:700;font-size:.75rem;margin-left:6px">👥 ${slotActiveGuests} נוכחים</span>` : '';
+      return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}${activeLabel}</div><div class="slot-bar-wrap" style="position:relative"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div>${activePctSlot > 0 ? `<div style="position:absolute;top:0;right:0;height:100%;width:${activePctSlot}%;background:var(--blue);border-radius:4px;opacity:.5"></div>` : ''}</div></div><span style="color:var(--muted);font-size:.8rem">${slotParticipants}/${S.maxCapacity}</span></div>`;
     }).join('');
   }
 
@@ -2826,7 +2830,7 @@ function copyAllEventsLink() {
 // ============================================================
 //  MARKETING TEXT GENERATOR
 // ============================================================
-const TOFY_SIG = `\n\n🌈 *טופי* - הפקות אירועים`;
+const TOFY_SIG = `\n\n🌈 *חברים של טופי בע״מ*`;
 
 // Attraction-specific descriptions for marketing
 const ATTRACTION_VIBES = {
@@ -3312,7 +3316,7 @@ function shareEventWithFriends() {
   msg += '\n\nהייתי באירוע מדהים וחייב/ת לספר לכם!';
   msg += attrs;
   msg += '\n\nהכניסה *בחינם* 🎉\nלהרשמה: ' + regUrl;
-  msg += '\n\n🌈 *טופי* - הפקות אירועים';
+  msg += '\n\n🌈 *חברים של טופי בע״מ*';
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -3365,7 +3369,7 @@ function shareOtherEvent(eventId, title, date) {
   let msg = '🌈 *' + title + '*';
   if (date) msg += ' - ' + date;
   msg += '\n\nאירוע מדהים בחינם!\nלהרשמה: ' + regUrl;
-  msg += '\n\n🌈 *טופי* - הפקות אירועים';
+  msg += '\n\n🌈 *חברים של טופי בע״מ*';
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -3451,7 +3455,7 @@ function renderOtherEvents() {
 function shareOtherEvent(eventId, title, date) {
   const base = window.location.origin + window.location.pathname;
   const url = `${base}?event=${eventId}#register`;
-  const msg = `היי! יש אירוע חינמי${title ? ' — ' + title : ''}${date ? ' ב-' + date : ''}!\n\nלהרשמה:\n${url}\n\n🌈 טופי הפקות אירועים`;
+  const msg = `היי! יש אירוע חינמי${title ? ' — ' + title : ''}${date ? ' ב-' + date : ''}!\n\nלהרשמה:\n${url}\n\n🌈 חברים של טופי בע״מ`;
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -3501,7 +3505,7 @@ function exportRatingSummary() {
   txt += 'ממוצע: ' + rs.avg + ' / 5\n';
   txt += 'סה"כ דירוגים: ' + rs.total + '\n\n';
   for (let i = 4; i >= 0; i--) { txt += (i+1) + ' כוכבים: ' + rs.dist[i] + '\n'; }
-  txt += '\n🌈 טופי - הפקות אירועים';
+  txt += '\n🌈 חברים של טופי בע״מ';
   navigator.clipboard.writeText(txt).then(() => showSuccess('סיכום דירוגים הועתק!'));
 }
 
