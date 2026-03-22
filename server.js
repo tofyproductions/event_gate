@@ -164,6 +164,14 @@ app.get('/api/events/:id', (req, res) => {
     slotDurationMin: ev.slotDurationMin,
     attractions: ev.attractions, eventAddress: ev.eventAddress,
     date: ev.date, slotCounts,
+    waitlistCounts: (() => {
+      const wc = {};
+      (ev.slots || []).forEach(s => { wc[s.index] = 0; });
+      Object.values(ev.waitlist || {}).filter(w => w.status === 'waiting').forEach(w => {
+        wc[w.slotIndex] = (wc[w.slotIndex] || 0) + (w.participants || 1);
+      });
+      return wc;
+    })(),
   });
 });
 
@@ -208,7 +216,7 @@ app.post('/api/events', requireAdmin, (req, res) => {
     slots: generateSlots(startTime, ns, dur),
     clientToken: randomCode(8),
     attractions: sanitize(attractions, 500), eventAddress: sanitize(eventAddress, 200),
-    guests: {}, preRegs: {}, createdAt: Date.now(),
+    guests: {}, preRegs: {}, waitlist: {}, createdAt: Date.now(),
   };
 
   db.events[id] = ev;
@@ -269,20 +277,31 @@ app.post('/api/events/:id/register', registerLimiter, (req, res) => {
   }
 
   const pCount = Math.max(1, Math.min(4, parseInt(participants) || 1));
-  const slotParticipants = Object.values(ev.preRegs).filter(r => r.slotIndex === slotIndex)
+  const slotParticipants = Object.values(ev.preRegs).filter(r => r.slotIndex === slotIndex && r.status !== 'waitlist')
     .reduce((sum, r) => sum + (r.participants || 1), 0);
-  if (slotParticipants + pCount > ev.maxCapacity) {
-    return res.status(400).json({ error: `אין מספיק מקומות (${ev.maxCapacity - slotParticipants} פנויים)` });
+
+  const isFull = slotParticipants + pCount > ev.maxCapacity;
+  const code = randomCode(6);
+
+  if (isFull) {
+    // Add to waitlist
+    if (!ev.waitlist) ev.waitlist = {};
+    ev.waitlist[code] = {
+      code, name: sanitize(name), phone: sanitize(phone, 20),
+      registeredAt: Date.now(), slotIndex: parseInt(slotIndex),
+      participants: pCount, status: 'waiting',
+    };
+    saveDB();
+    return res.json({ code, slot: ev.slots[slotIndex], waitlist: true, position: Object.values(ev.waitlist).filter(w => w.slotIndex === slotIndex && w.status === 'waiting').length });
   }
 
-  const code = randomCode(6);
   ev.preRegs[code] = {
     code, name: sanitize(name), phone: sanitize(phone, 20),
     registeredAt: Date.now(), arrived: false,
-    slotIndex: parseInt(slotIndex), participants: pCount,
+    slotIndex: parseInt(slotIndex), participants: pCount, status: 'confirmed',
   };
   saveDB();
-  res.json({ code, slot: ev.slots[slotIndex] });
+  res.json({ code, slot: ev.slots[slotIndex], waitlist: false });
 });
 
 // ========== API: CHECK-IN ==========
@@ -373,6 +392,34 @@ app.post('/api/events/:id/release/:code', requireAdmin, (req, res) => {
   if (!ev) return res.status(404).json({ error: 'אירוע לא נמצא' });
   if (!ev.preRegs[req.params.code]) return res.status(404).json({ error: 'רישום לא נמצא' });
   delete ev.preRegs[req.params.code];
+  saveDB();
+  res.json({ ok: true });
+});
+
+// Approve waitlist entry (admin) — moves from waitlist to preRegs
+app.post('/api/events/:id/waitlist/:code/approve', requireAdmin, (req, res) => {
+  const ev = db.events[req.params.id];
+  if (!ev) return res.status(404).json({ error: 'אירוע לא נמצא' });
+  if (!ev.waitlist || !ev.waitlist[req.params.code]) return res.status(404).json({ error: 'ממתין לא נמצא' });
+  const w = ev.waitlist[req.params.code];
+  // Move to preRegs
+  ev.preRegs[w.code] = {
+    code: w.code, name: w.name, phone: w.phone,
+    registeredAt: w.registeredAt, arrived: false,
+    slotIndex: w.slotIndex, participants: w.participants, status: 'confirmed',
+    approvedAt: Date.now(),
+  };
+  delete ev.waitlist[req.params.code];
+  saveDB();
+  res.json({ ok: true, reg: ev.preRegs[w.code] });
+});
+
+// Remove from waitlist (admin)
+app.delete('/api/events/:id/waitlist/:code', requireAdmin, (req, res) => {
+  const ev = db.events[req.params.id];
+  if (!ev) return res.status(404).json({ error: 'אירוע לא נמצא' });
+  if (!ev.waitlist || !ev.waitlist[req.params.code]) return res.status(404).json({ error: 'ממתין לא נמצא' });
+  delete ev.waitlist[req.params.code];
   saveDB();
   res.json({ ok: true });
 });

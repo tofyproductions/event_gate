@@ -1012,6 +1012,9 @@
   <div class="section-title">נרשמים מראש <span class="badge badge-blue" id="dbRegBadge">0</span></div>
   <div id="dbRegList"></div>
 
+  <div class="section-title" id="dbWaitlistTitle" style="display:none">⏳ רשימת המתנה <span class="badge badge-yellow" id="dbWaitlistBadge">0</span></div>
+  <div id="dbWaitlistList"></div>
+
   <button class="collapsible-btn" onclick="toggleEl('dbHistory')">היסטוריית יציאות &#9660;</button>
   <div class="collapsible" id="dbHistory"></div>
 
@@ -2100,13 +2103,9 @@ function doRegister() {
   if (!phone || phone.replace(/[^0-9]/g, '').length < 9) { showError('נא להזין מספר טלפון תקין'); return; }
   if (selectedRegSlot < 0) { showError('נא לבחור חלון זמן'); return; }
 
-  const participants = Math.max(1, Math.min(20, parseInt(document.getElementById('regParticipants').value) || 1));
-  const regs = Object.values(S.preRegs);
-  const slotParticipants = regs.filter(r => r.slotIndex === selectedRegSlot).reduce((sum, r) => sum + (r.participants || 1), 0);
-  if (slotParticipants + participants > S.maxCapacity) { showError('אין מספיק מקומות בחלון זמן זה (' + (S.maxCapacity - slotParticipants) + ' פנויים)'); renderRegister(); return; }
+  const participants = Math.max(1, Math.min(4, parseInt(document.getElementById('regParticipants').value) || 1));
 
-  // Register via server API (primary) + local fallback
-  let code = randomCode();
+  // Register via server API
   (async () => {
     try {
       const res = await fetch('/api/events/' + activeEventId + '/register', {
@@ -2114,30 +2113,53 @@ function doRegister() {
         body: JSON.stringify({ name: name.slice(0, 100), phone: phone.slice(0, 20), slotIndex: selectedRegSlot, participants })
       });
       const data = await res.json();
-      if (res.ok && data.code) {
-        code = data.code; // Use server-generated code
-        document.getElementById('regSuccessCode').textContent = code;
-      } else if (data.error) { showError(data.error); return; }
-    } catch(e) { console.log('Server registration failed, using local:', e.message); }
-  })();
-  S.preRegs[code] = {
-    code, name: name.slice(0, 100), phone: phone.slice(0, 20),
-    registeredAt: Date.now(), arrived: false, slotIndex: selectedRegSlot,
-    participants: participants,
-  };
-  save();
+      if (!res.ok) { showError(data.error || 'שגיאה ברישום'); return; }
 
-  const slot = S.slots[selectedRegSlot];
-  document.getElementById('regSuccessName').textContent = name + (participants > 1 ? ' (' + participants + ' משתתפים)' : '');
-  document.getElementById('regSuccessSlot').textContent = `סבב ${selectedRegSlot + 1}: ${slot.label}`;
-  const regTime = new Date();
-  document.getElementById('regSuccessTime').textContent = `נרשם/ה ב-${regTime.toLocaleDateString('he-IL')} ${regTime.toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'})}`;
-  document.getElementById('regSuccessCode').textContent = code;
-  renderNavButtons('regNavButtons', S);
-  document.getElementById('regFormSection').style.display = 'none';
-  document.getElementById('regSuccessSection').style.display = 'block';
-  renderOtherEvents();
-  if (navigator.vibrate) navigator.vibrate(100);
+      const code = data.code;
+      const slot = S.slots[selectedRegSlot];
+
+      // Also save locally
+      if (!data.waitlist) {
+        S.preRegs[code] = {
+          code, name: name.slice(0, 100), phone: phone.slice(0, 20),
+          registeredAt: Date.now(), arrived: false, slotIndex: selectedRegSlot,
+          participants, status: 'confirmed',
+        };
+        save();
+      }
+
+      if (data.waitlist) {
+        // Waitlist response
+        document.getElementById('regSuccessName').textContent = name + (participants > 1 ? ' (' + participants + ' משתתפים)' : '');
+        document.getElementById('regSuccessSlot').textContent = `סבב ${selectedRegSlot + 1}: ${slot.label}`;
+        document.getElementById('regSuccessCode').textContent = code;
+        const regTime = new Date();
+        document.getElementById('regSuccessTime').innerHTML = `
+          <div style="background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:12px;margin:8px 0">
+            <div style="font-weight:700;color:var(--orange);margin-bottom:4px">⏳ נרשמת לרשימת ההמתנה</div>
+            <div style="font-size:.8rem;color:var(--muted)">מיקום בתור: ${data.position || '?'}</div>
+            <div style="font-size:.75rem;color:var(--muted);margin-top:4px">הסבב מלא כרגע. אם יתפנה מקום — תקבלו אישור השתתפות.</div>
+            <div style="font-size:.75rem;color:var(--muted);margin-top:2px">שמרו את הקוד: <strong style="color:var(--text)">${code}</strong></div>
+          </div>`;
+      } else {
+        // Normal success
+        document.getElementById('regSuccessName').textContent = name + (participants > 1 ? ' (' + participants + ' משתתפים)' : '');
+        document.getElementById('regSuccessSlot').textContent = `סבב ${selectedRegSlot + 1}: ${slot.label}`;
+        const regTime = new Date();
+        document.getElementById('regSuccessTime').textContent = `נרשם/ה ב-${regTime.toLocaleDateString('he-IL')} ${regTime.toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'})}`;
+        document.getElementById('regSuccessCode').textContent = code;
+      }
+
+      renderNavButtons('regNavButtons', S);
+      document.getElementById('regFormSection').style.display = 'none';
+      document.getElementById('regSuccessSection').style.display = 'block';
+      renderOtherEvents();
+      if (navigator.vibrate) navigator.vibrate(100);
+    } catch(e) {
+      showError('שגיאת חיבור — נסו שוב');
+      console.error('Registration error:', e);
+    }
+  })();
 }
 
 // ============================================================
@@ -2798,6 +2820,23 @@ function renderDashboard() {
     }).join('');
   }
 
+  // Waitlist
+  const waitlist = Object.values(S.waitlist || {}).filter(w => w.status === 'waiting');
+  const wlTitle = document.getElementById('dbWaitlistTitle');
+  const wlList = document.getElementById('dbWaitlistList');
+  if (waitlist.length > 0) {
+    wlTitle.style.display = '';
+    document.getElementById('dbWaitlistBadge').textContent = waitlist.length;
+    wlList.innerHTML = waitlist.sort((a, b) => a.registeredAt - b.registeredAt).map(w => {
+      const slot = S.slots && S.slots[w.slotIndex] ? `סבב ${w.slotIndex + 1} (${S.slots[w.slotIndex].label})` : '';
+      const regTime = w.registeredAt ? formatHM(w.registeredAt) : '';
+      return `<div class="guest-card" style="border-right:3px solid var(--orange)"><div><div class="guest-name">${esc(w.name)}${w.participants > 1 ? ' <span style="color:var(--orange);font-size:.7rem">(' + w.participants + ' משתתפים)</span>' : ''} <span class="type-tag" style="background:rgba(249,115,22,.12);color:var(--orange)">ממתין/ה</span></div><div class="guest-sub">${slot}${w.phone ? ' | ' + esc(w.phone) : ''}${regTime ? ' | נרשם ' + regTime : ''}</div></div><div class="guest-right"><button class="btn-sm green" onclick="approveWaitlist('${w.code}')">✓ אשר</button> <button class="btn-sm red" onclick="removeWaitlist('${w.code}')">הסר</button></div></div>`;
+    }).join('');
+  } else {
+    wlTitle.style.display = 'none';
+    wlList.innerHTML = '';
+  }
+
   // History
   const histEl = document.getElementById('dbHistory');
   if (hist.length === 0) {
@@ -2871,6 +2910,46 @@ function releaseReg(code) {
       method: 'POST', headers: { 'x-admin-token': apiToken }
     }).catch(() => {});
   }
+  renderAll();
+}
+
+function approveWaitlist(code) {
+  if (!confirm('לאשר את הממתין/ה ולהעביר לרישום?')) return;
+  if (apiToken) {
+    fetch('/api/events/' + activeEventId + '/waitlist/' + code + '/approve', {
+      method: 'POST', headers: { 'x-admin-token': apiToken }
+    }).then(r => r.json()).then(data => {
+      if (data.ok && data.reg) {
+        // Move from waitlist to preRegs locally
+        if (S.waitlist && S.waitlist[code]) delete S.waitlist[code];
+        S.preRegs[code] = data.reg;
+        save();
+        showSuccess('הממתין/ה אושר/ה ונרשם/ה בהצלחה!');
+        renderAll();
+      }
+    }).catch(() => showError('שגיאה באישור'));
+  } else {
+    // Local fallback
+    if (S.waitlist && S.waitlist[code]) {
+      const w = S.waitlist[code];
+      S.preRegs[code] = { ...w, arrived: false, status: 'confirmed', approvedAt: Date.now() };
+      delete S.waitlist[code];
+      save();
+      showSuccess('הממתין/ה אושר/ה!');
+      renderAll();
+    }
+  }
+}
+
+function removeWaitlist(code) {
+  if (!confirm('להסיר מרשימת ההמתנה?')) return;
+  if (apiToken) {
+    fetch('/api/events/' + activeEventId + '/waitlist/' + code, {
+      method: 'DELETE', headers: { 'x-admin-token': apiToken }
+    }).catch(() => {});
+  }
+  if (S.waitlist && S.waitlist[code]) delete S.waitlist[code];
+  save();
   renderAll();
 }
 
