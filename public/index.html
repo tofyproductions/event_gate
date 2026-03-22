@@ -1152,14 +1152,29 @@ setTimeout(async () => {
 
 // Auto-sync every 5 seconds
 setInterval(async () => {
-  if (apiToken && activeEventId) {
-    try {
+  if (!apiToken) return;
+  try {
+    // Always sync registry (event list)
+    const data = await api('GET', '/events');
+    if (data.events) {
+      const reg = data.events.map(ev => ({
+        id: ev.id, clientName: ev.clientName, eventName: ev.eventName,
+        contactName: ev.contactName, contactPhone: ev.contactPhone,
+        date: ev.date, clientToken: ev.clientToken,
+        attractions: ev.attractions, eventAddress: ev.eventAddress,
+        createdAt: ev.createdAt
+      }));
+      localStorage.setItem(REGISTRY_KEY, JSON.stringify(reg));
+      if (typeof renderHome === 'function') renderHome();
+    }
+    // Sync active event full data
+    if (activeEventId) {
       const full = await api('GET', '/events/' + activeEventId + '/full');
       localStorage.setItem(storageKeyFor(activeEventId), JSON.stringify(full));
       S = { ...defaultState(), ...full };
       renderAll();
-    } catch(e) {}
-  }
+    }
+  } catch(e) {}
 }, 5000);
 
 
@@ -1291,6 +1306,47 @@ function loadData(eventId) {
 function save() {
   if (!activeEventId) return;
   localStorage.setItem(storageKeyFor(activeEventId), JSON.stringify(S));
+  // Sync to server in background
+  if (apiToken && S.configured) {
+    fetch('/api/events/' + activeEventId + '/full', {
+      headers: { 'x-admin-token': apiToken }
+    }).then(r => r.ok ? null : apiCreateOrUpdateEvent()).catch(() => apiCreateOrUpdateEvent());
+  }
+}
+
+async function apiCreateOrUpdateEvent() {
+  if (!apiToken || !S.configured || !activeEventId) return;
+  const date = S.startTime ? new Date(S.startTime).toISOString().split('T')[0] : '';
+  const time = S.startTime ? new Date(S.startTime).toTimeString().slice(0,5) : '';
+  const body = {
+    clientName: S.clientName || '', eventName: S.eventName || '',
+    contactName: S.contactName || '', contactPhone: S.contactPhone || '',
+    date, time, numSlots: S.numSlots, slotDurationMin: S.slotDurationMin,
+    maxCapacity: S.maxCapacity, attractions: S.attractions || '',
+    eventAddress: S.eventAddress || '',
+  };
+  try {
+    // Try update first
+    let res = await fetch('/api/events/' + activeEventId, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 404) {
+      // Create new
+      res = await fetch('/api/events', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.event && data.event.clientToken) {
+          S.clientToken = data.event.clientToken;
+          S.serverId = data.event.id;
+          localStorage.setItem(storageKeyFor(activeEventId), JSON.stringify(S));
+        }
+      }
+    }
+  } catch(e) { console.log('API sync error:', e.message); }
 }
 
 // --- Migrate old single-event data ---
@@ -1770,6 +1826,26 @@ function saveSetup() {
   if (idx >= 0) { reg[idx] = { ...reg[idx], ...entry }; } else { reg.push(entry); }
   saveRegistry(reg);
   saveClientFromEvent();
+
+  // Create/update on server
+  if (apiToken) {
+    (async () => {
+      try {
+        const body = { clientName: S.clientName, eventName: S.eventName, contactName: S.contactName,
+          contactPhone: S.contactPhone, date, time, numSlots: ns, slotDurationMin: dur,
+          maxCapacity: mc, attractions: S.attractions, eventAddress: S.eventAddress };
+        const res = await fetch('/api/events', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
+          body: JSON.stringify(body)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.event) { S.clientToken = data.event.clientToken; save(); }
+          console.log('Event synced to server');
+        }
+      } catch(e) { console.log('Server sync:', e.message); }
+    })();
+  }
 
   updateClientLinkCard();
   showSuccess(`האירוע הוגדר! ${ns} סבבים, עד ${mc} משתתפים`);
