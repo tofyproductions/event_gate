@@ -3610,28 +3610,54 @@ if (urlSelfCheckin) {
   }
 } else if (urlEventId) {
   showCloseButton();
+  isClientMode = true; // Mark as public view — hide admin UI
   // Check if event exists in this browser's storage
   const evData = loadData(urlEventId);
   if (evData.configured) {
     switchEvent(urlEventId);
-    initSetup();
-    updateClientLinkCard();
-    restoreCheckin();
-    renderAll();
-  } else {
-    // Event not found in this browser — show friendly message
+    // Hide admin nav and show only registration page
     document.querySelector('.nav').style.display = 'none';
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    const errDiv = document.createElement('div');
-    errDiv.style.cssText = 'text-align:center;padding:60px 20px;min-height:100dvh;background:var(--bg)';
-    errDiv.innerHTML = '<div style="font-size:3rem;margin-bottom:12px">&#128533;</div>' +
-      '<div style="font-size:1.2rem;font-weight:700;margin-bottom:8px">הקישור לא זמין</div>' +
-      '<div style="color:var(--muted);font-size:.9rem;line-height:1.6;max-width:320px;margin:0 auto">' +
-      'המערכת שומרת נתונים מקומית בדפדפן.<br>קישור זה פועל רק מהמכשיר בו נוצר האירוע.' +
-      '<br><br>לפריסה עם קישורים ציבוריים, יש להעלות לשרת.' +
-      '</div>' +
-      '<div style="margin-top:20px"><a href="' + window.location.pathname + '" style="color:var(--blue);font-weight:600">חזרה לדף הבית</a></div>';
-    document.body.appendChild(errDiv);
+    restoreCheckin();
+    renderAll();
+    const hash = window.location.hash.replace('#', '');
+    if (hash === 'checkin') {
+      document.getElementById('page-checkin').classList.add('active');
+    } else {
+      document.getElementById('page-register').classList.add('active');
+    }
+  } else {
+    // Event not found locally — try to load from server API
+    document.querySelector('.nav').style.display = 'none';
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    (async () => {
+      try {
+        const res = await fetch('/api/events/' + urlEventId);
+        if (res.ok) {
+          const serverEvent = await res.json();
+          // Store locally and show registration
+          const state = { ...defaultState(), ...serverEvent, _serverId: serverEvent.id };
+          localStorage.setItem(storageKeyFor(urlEventId), JSON.stringify(state));
+          switchEvent(urlEventId);
+          renderAll();
+          const hash = window.location.hash.replace('#', '');
+          if (hash === 'checkin') {
+            document.getElementById('page-checkin').classList.add('active');
+          } else {
+            document.getElementById('page-register').classList.add('active');
+          }
+        } else {
+          throw new Error('not found');
+        }
+      } catch(e) {
+        const errDiv = document.createElement('div');
+        errDiv.style.cssText = 'text-align:center;padding:60px 20px;min-height:100dvh;background:var(--bg)';
+        errDiv.innerHTML = '<div style="font-size:3rem;margin-bottom:12px">&#128533;</div>' +
+          '<div style="font-size:1.2rem;font-weight:700;margin-bottom:8px">האירוע לא נמצא</div>' +
+          '<div style="color:var(--muted);font-size:.9rem">ייתכן שהקישור שגוי או שהאירוע הסתיים.</div>';
+        document.body.appendChild(errDiv);
+      }
+    })();
   }
 } else {
   // Check for last active event
