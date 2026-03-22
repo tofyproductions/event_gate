@@ -2479,7 +2479,7 @@ function renderDashboard() {
         return `<div class="guest-card prereg"><div><div class="guest-name">${esc(r.name)}${r.participants > 1 ? ' <span style="color:var(--blue);font-size:.7rem">(' + r.participants + ')</span>' : ''} ${statusTag}</div><div class="guest-sub">${slotLbl}${r.phone ? ' | ' + esc(r.phone) : ''}${regTimeA ? ' | נרשם ' + regTimeA : ''}</div></div><div class="guest-right">${durHtml}</div></div>`;
       } else {
         const regTimeP = r.registeredAt ? formatHM(r.registeredAt) : '';
-        return `<div class="guest-card pending"><div><div class="guest-name">${esc(r.name)}${r.participants > 1 ? ' <span style="color:var(--blue);font-size:.7rem">(' + r.participants + ')</span>' : ''} <span class="type-tag tag-pending">טרם הגיע/ה</span></div><div class="guest-sub">${slotLbl}${r.phone ? ' | ' + esc(r.phone) : ''}${regTimeP ? ' | נרשם ' + regTimeP : ''}</div></div><div class="guest-right"><span style="font-size:.65rem;color:var(--muted);direction:ltr">${r.code}</span> <button class="btn-sm red" onclick="releaseReg('${r.code}')">שחרר</button></div></div>`;
+        return `<div class="guest-card pending"><div><div class="guest-name">${esc(r.name)}${r.participants > 1 ? ' <span style="color:var(--blue);font-size:.7rem">(' + r.participants + ' משתתפים)</span>' : ''} <span class="type-tag tag-pending">טרם הגיע/ה</span></div><div class="guest-sub">${slotLbl}${r.phone ? ' | ' + esc(r.phone) : ''}${regTimeP ? ' | נרשם ' + regTimeP : ''}</div></div><div class="guest-right"><span style="font-size:.65rem;color:var(--muted);direction:ltr">${r.code}</span> <button class="btn-sm green" onclick="adminCheckin('${r.code}')">✓ הגיע</button> <button class="btn-sm red" onclick="releaseReg('${r.code}')">שחרר</button></div></div>`;
       }
     }).join('');
   }
@@ -2507,6 +2507,27 @@ function adminCheckout(id) {
       method: 'POST', headers: { 'x-admin-token': apiToken }
     }).catch(() => {});
   }
+  renderAll();
+}
+
+function adminCheckin(code) {
+  const r = S.preRegs[code];
+  if (!r || r.arrived) return;
+  const ac = activeCount();
+  const gs = r.participants || 1;
+  if (ac + gs > S.maxCapacity) { showError('האירוע מלא — אין מקום ל-' + gs + ' משתתפים'); return; }
+  r.arrived = true;
+  const id = randomId();
+  const now = Date.now();
+  S.guests[id] = { id, name: r.name, checkinTime: now, checkoutTime: null, type: 'preregistered', regCode: code, slotIndex: r.slotIndex, groupSize: gs };
+  save();
+  if (apiToken) {
+    fetch('/api/events/' + activeEventId + '/checkin', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
+      body: JSON.stringify({ code, type: 'preregistered' })
+    }).catch(() => {});
+  }
+  showSuccess(`${r.name} נכנס/ה לאירוע (${gs} משתתפים)`);
   renderAll();
 }
 
