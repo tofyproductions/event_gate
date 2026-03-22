@@ -1508,6 +1508,24 @@ function renderHomeList(el, reg) {
         <span>&#128203; ${totalRegs} נרשמו</span>
         <span>${data.numSlots || 0} סבבים</span>
       </div>
+      ${evSlots.length > 0 ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px;margin:4px 0 8px">
+        ${evSlots.map((sl, i) => {
+          const slRegs = Object.values(data.preRegs).filter(r => r.slotIndex === i).reduce((s,r) => s + (r.participants||1), 0);
+          const pct = Math.round(slRegs / (data.maxCapacity || 50) * 100);
+          const barColor = pct >= 90 ? 'var(--red)' : pct >= 60 ? 'var(--yellow)' : 'var(--green)';
+          const now = Date.now();
+          const isActive = now >= sl.startTime && now < sl.endTime;
+          const border = isActive ? 'border:1px solid var(--green)' : 'border:1px solid var(--border)';
+          return `<div style="background:var(--bg);border-radius:8px;padding:6px 8px;font-size:.65rem;${border}">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="color:var(--muted)">סבב ${i+1}</span>
+              <span style="font-weight:700;color:${barColor}">${slRegs}/${data.maxCapacity||50}</span>
+            </div>
+            <div style="height:3px;background:var(--card);border-radius:2px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px"></div></div>
+            <div style="color:var(--muted);margin-top:2px;direction:ltr;text-align:center">${sl.label}</div>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
       <div class="ec-actions">
         ${status !== 'past' ? `<button class="btn-sm orange" onclick="editEvent('${ev.id}')">&#9998; \u05e2\u05e8\u05d9\u05db\u05d4</button>` : ''}
         <button class="btn-sm red" onclick="deleteEvent('${ev.id}')">\u05de\u05d7\u05e7</button>
