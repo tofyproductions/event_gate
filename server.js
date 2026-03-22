@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 
@@ -24,22 +25,61 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// ========== PERSISTENCE ==========
+// ========== PERSISTENCE (MongoDB + file fallback) ==========
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || '';
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-function loadDB() {
+let mongoDb = null;
+let mongoConnected = false;
+
+async function connectMongo() {
+  if (!MONGO_URI) return false;
+  try {
+    const client = new MongoClient(MONGO_URI);
+    await client.connect();
+    mongoDb = client.db('eventgate');
+    mongoConnected = true;
+    console.log('MongoDB connected successfully');
+    return true;
+  } catch (e) {
+    console.error('MongoDB connection failed:', e.message);
+    return false;
+  }
+}
+
+function loadDBFromFile() {
   try {
     if (fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  } catch (e) { console.error('Failed to load DB:', e.message); }
+  } catch (e) {}
   return { events: {}, clients: {}, members: [] };
 }
 
-function saveDB() {
-  try { fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2)); }
-  catch (e) { console.error('Failed to save DB:', e.message); }
+async function loadDB() {
+  if (mongoConnected) {
+    try {
+      const doc = await mongoDb.collection('state').findOne({ _id: 'main' });
+      if (doc) { delete doc._id; return doc; }
+    } catch (e) { console.error('MongoDB load failed:', e.message); }
+  }
+  return loadDBFromFile();
 }
 
-let db = loadDB();
+async function saveDB() {
+  // Save to file (backup)
+  try { fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2)); } catch (e) {}
+  // Save to MongoDB
+  if (mongoConnected) {
+    try {
+      await mongoDb.collection('state').replaceOne(
+        { _id: 'main' },
+        { _id: 'main', ...db },
+        { upsert: true }
+      );
+    } catch (e) { console.error('MongoDB save failed:', e.message); }
+  }
+}
+
+let db = loadDBFromFile();
 
 // Auto-save every 30 seconds
 setInterval(saveDB, 30000);
@@ -355,9 +395,24 @@ app.get('*', (req, res) => {
 
 // ========== START ==========
 const PORT = process.env.PORT || 3333;
-app.listen(PORT, () => {
-  console.log(`\n========================================`);
-  console.log(`  Event Gate Server running on port ${PORT}`);
-  console.log(`  Admin Token: ${ADMIN_TOKEN}`);
-  console.log(`========================================\n`);
-});
+
+(async () => {
+  // Connect to MongoDB
+  if (MONGO_URI) {
+    const connected = await connectMongo();
+    if (connected) {
+      db = await loadDB();
+      console.log(`MongoDB loaded: ${Object.keys(db.events || {}).length} events`);
+    }
+  } else {
+    console.log('No MONGO_URI set — using file-based storage');
+  }
+
+  app.listen(PORT, () => {
+    console.log(`\n========================================`);
+    console.log(`  Event Gate Server running on port ${PORT}`);
+    console.log(`  Admin Token: ${ADMIN_TOKEN}`);
+    console.log(`  MongoDB: ${mongoConnected ? 'Connected ✓' : 'Not configured'}`);
+    console.log(`========================================\n`);
+  });
+})();
