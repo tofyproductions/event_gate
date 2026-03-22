@@ -961,6 +961,40 @@
     <div class="stat-card"><div class="stat-val" style="color:var(--blue)" id="dbAvg">-</div><div class="stat-lbl">שהייה ממוצעת</div></div>
   </div>
 
+  <!-- Command Bar (admin) -->
+  <div id="dbCommandBar" style="background:linear-gradient(135deg,rgba(59,130,246,.06),rgba(168,85,247,.06));border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px">
+    <div style="font-size:.8rem;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px">🎛️ סרגל פיקוד</div>
+    <!-- Active slot -->
+    <div id="dbActiveSlot" style="text-align:center;font-size:.75rem;color:var(--muted);padding:6px;background:var(--bg);border-radius:8px;margin-bottom:8px;display:none">
+      <span id="dbActiveSlotText"></span>
+    </div>
+    <!-- Quick stats -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+      <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+        <div style="font-size:1.2rem;font-weight:800;color:var(--green)" id="dbCmdActive">0</div>
+        <div style="font-size:.6rem;color:var(--muted)">נוכחים</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+        <div style="font-size:1.2rem;font-weight:800;color:var(--blue)" id="dbCmdRegs">0</div>
+        <div style="font-size:.6rem;color:var(--muted)">נרשמו</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+        <div style="font-size:1.2rem;font-weight:800;color:var(--yellow)" id="dbCmdPending">0</div>
+        <div style="font-size:.6rem;color:var(--muted)">טרם הגיעו</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+        <div style="font-size:1.2rem;font-weight:800;color:var(--orange)" id="dbCmdWalkin">0</div>
+        <div style="font-size:.6rem;color:var(--muted)">מזדמנים</div>
+      </div>
+    </div>
+    <!-- Active guests with quick checkout -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-weight:700;font-size:.8rem">👥 אורחים נוכחים</span>
+      <span class="badge badge-green" id="dbCmdGuestCount">0</span>
+    </div>
+    <div id="dbCmdActiveGuests" style="max-height:180px;overflow-y:auto"></div>
+  </div>
+
   <div class="section-title">סבבים</div>
   <div id="dbSlots"></div>
 
@@ -2583,6 +2617,70 @@ function renderDashboard() {
   document.getElementById('dbRegTotal').textContent = regTotalParticipants;
   document.getElementById('dbRegPending').textContent = regPendingParticipants;
   document.getElementById('dbActiveBadge').textContent = ac;
+
+  // ===== Command Bar (admin) =====
+  const el = (id) => document.getElementById(id);
+  const guests = Object.values(S.guests || {});
+  if (el('dbCmdActive')) el('dbCmdActive').textContent = ac;
+  if (el('dbCmdRegs')) el('dbCmdRegs').textContent = regTotalParticipants;
+  if (el('dbCmdPending')) el('dbCmdPending').textContent = regPendingParticipants;
+  if (el('dbCmdWalkin')) el('dbCmdWalkin').textContent = guests.filter(g => !g.checkoutTime && g.type === 'walkin').reduce((s,g) => s + (g.groupSize||1), 0);
+
+  // Active slot
+  const dbSlotEl = el('dbActiveSlot');
+  const dbSlotText = el('dbActiveSlotText');
+  if (dbSlotEl && S.slots) {
+    const currentSlot = S.slots.find(sl => now >= sl.startTime && now < sl.endTime);
+    if (currentSlot) {
+      dbSlotEl.style.display = 'block';
+      dbSlotEl.style.background = 'rgba(34,197,94,.1)';
+      dbSlotEl.style.border = '1px solid rgba(34,197,94,.3)';
+      dbSlotText.innerHTML = `🟢 <strong>סבב ${currentSlot.index + 1} פעיל</strong> | ${currentSlot.label}`;
+    } else {
+      const nextSlot = S.slots.find(sl => now < sl.startTime);
+      if (nextSlot) {
+        dbSlotEl.style.display = 'block';
+        dbSlotEl.style.background = 'rgba(59,130,246,.1)';
+        dbSlotEl.style.border = '1px solid rgba(59,130,246,.3)';
+        const minToNext = Math.ceil((nextSlot.startTime - now) / 60000);
+        dbSlotText.innerHTML = `🔵 סבב ${nextSlot.index + 1} מתחיל בעוד ${minToNext} דקות`;
+      } else {
+        dbSlotEl.style.display = 'block';
+        dbSlotEl.style.background = 'rgba(148,163,184,.1)';
+        dbSlotEl.style.border = '1px solid var(--border)';
+        dbSlotText.innerHTML = '⚫ כל הסבבים הסתיימו';
+      }
+    }
+  }
+
+  // Active guests list in command bar
+  const dbGuestsEl = el('dbCmdActiveGuests');
+  const dbGuestCount = el('dbCmdGuestCount');
+  if (dbGuestsEl) {
+    const activeG = guests.filter(g => !g.checkoutTime).sort((a,b) => b.checkinTime - a.checkinTime);
+    if (dbGuestCount) dbGuestCount.textContent = activeG.length;
+    if (activeG.length === 0) {
+      dbGuestsEl.innerHTML = '<div class="empty-msg" style="padding:10px;font-size:.75rem">אין אורחים כרגע</div>';
+    } else {
+      dbGuestsEl.innerHTML = activeG.map(g => {
+        const dur = now - g.checkinTime;
+        const durStr = formatDur(dur);
+        const gs = g.groupSize > 1 ? ` (${g.groupSize})` : '';
+        const slot = g.slotIndex >= 0 && S.slots && S.slots[g.slotIndex] ? S.slots[g.slotIndex] : null;
+        const overSlot = slot && now >= slot.endTime;
+        const borderColor = overSlot ? 'border-right:3px solid var(--red)' : 'border-right:3px solid var(--green)';
+        const typeBadge = g.type === 'walkin' ? '<span style="color:var(--orange);font-size:.6rem">מזדמן</span>' : '<span style="color:var(--blue);font-size:.6rem">רשום</span>';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg);border-radius:8px;margin-bottom:3px;font-size:.7rem;${borderColor}">
+          <div>
+            <strong>${esc(g.name)}${gs}</strong> ${typeBadge}
+            <span style="color:var(--muted);margin-right:4px">${durStr}</span>
+            ${overSlot ? '<span style="color:var(--red);font-weight:700">⏰</span>' : ''}
+          </div>
+          <button class="btn-sm red" onclick="quickCheckout('${g.id}')" style="padding:2px 6px;font-size:.6rem">הוצא</button>
+        </div>`;
+      }).join('');
+    }
+  }
   document.getElementById('dbRegBadge').textContent = regs.length + (regTotalParticipants > regs.length ? ` (${regTotalParticipants})` : '');
 
   // Slots
