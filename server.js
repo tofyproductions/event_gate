@@ -350,7 +350,7 @@ app.post('/api/events/:id/rate', (req, res) => {
 
 // ========== CATCH-ALL ==========
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'event-gate.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ========== START ==========

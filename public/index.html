@@ -1,590 +1,998 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>כניסה לאירוע</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --green: #22c55e;
-      --blue: #3b82f6;
-      --orange: #f97316;
-      --red: #ef4444;
-      --bg: #0f172a;
-      --card: #1e293b;
-      --text: #f1f5f9;
-      --muted: #94a3b8;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-    }
-    .header {
-      background: var(--card);
-      padding: 20px;
-      text-align: center;
-      border-bottom: 1px solid #334155;
-    }
-    .header h1 { font-size: 1.3rem; }
-    .header p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>טופי - הפקות אירועים</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--card:#1e293b;--card2:#283548;--text:#f1f5f9;--muted:#94a3b8;
+  --accent:#3b82f6;--accent2:#60a5fa;--green:#22c55e;--yellow:#eab308;--red:#ef4444;
+  --orange:#f97316;--purple:#a78bfa;--border:#334155;--radius:12px;
+}
+html{font-size:16px}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+a{color:var(--accent2);text-decoration:none}
+input,textarea,select,button{font-family:inherit;font-size:1rem;border:none;outline:none;border-radius:8px}
+input,textarea,select{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:10px 14px;width:100%}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px}
+button{cursor:pointer;padding:10px 20px;border-radius:8px;font-weight:600;transition:all .2s}
+.btn{background:var(--accent);color:#fff}
+.btn:hover{background:var(--accent2)}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover{opacity:.9}
+.btn-red{background:var(--red);color:#fff}
+.btn-red:hover{opacity:.9}
+.btn-orange{background:var(--orange);color:#fff}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:6px 14px;font-size:.85rem}
+.btn-block{width:100%;display:block}
+.card{background:var(--card);border-radius:var(--radius);padding:20px;margin-bottom:16px;border:1px solid var(--border)}
+.card2{background:var(--card2);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.75rem;font-weight:600}
+.badge-green{background:var(--green);color:#000}
+.badge-yellow{background:var(--yellow);color:#000}
+.badge-red{background:var(--red);color:#fff}
+.badge-blue{background:var(--accent);color:#fff}
+.badge-muted{background:var(--border);color:var(--muted)}
+h1{font-size:1.8rem;margin-bottom:8px}
+h2{font-size:1.4rem;margin-bottom:8px}
+h3{font-size:1.1rem;margin-bottom:6px}
+.text-muted{color:var(--muted)}
+.text-green{color:var(--green)}
+.text-yellow{color:var(--yellow)}
+.text-red{color:var(--red)}
+.text-center{text-align:center}
+.mt-1{margin-top:8px}.mt-2{margin-top:16px}.mt-3{margin-top:24px}
+.mb-1{margin-bottom:8px}.mb-2{margin-bottom:16px}
+.gap-1{gap:8px}.gap-2{gap:16px}
+.flex{display:flex}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 
-    .screen { display: none; flex: 1; flex-direction: column; padding: 24px; }
-    .screen.active { display: flex; }
+/* Layout */
+#app{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--card);border-left:1px solid var(--border);padding:20px 16px;display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;z-index:100}
+.sidebar .logo{font-size:1.2rem;font-weight:700;color:var(--accent2);margin-bottom:24px;text-align:center}
+.sidebar .nav-item{padding:10px 14px;border-radius:8px;cursor:pointer;margin-bottom:4px;color:var(--muted);transition:all .2s;display:flex;align-items:center;gap:8px}
+.sidebar .nav-item:hover,.sidebar .nav-item.active{background:var(--bg);color:var(--text)}
+.sidebar .nav-item.active{border-right:3px solid var(--accent)}
+.main{flex:1;margin-right:220px;padding:24px;max-width:960px}
+.bottom-nav{display:none}
 
-    /* Choice screen */
-    .choice-screen {
-      justify-content: center;
-      align-items: center;
-      gap: 20px;
-    }
-    .choice-icon { font-size: 3.5rem; text-align: center; }
-    .choice-text { text-align: center; color: var(--muted); line-height: 1.6; font-size: 1rem; max-width: 350px; }
+@media(max-width:768px){
+  .sidebar{display:none}
+  .main{margin-right:0;padding:16px;padding-bottom:80px}
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);z-index:100;justify-content:space-around;padding:8px 0}
+  .bottom-nav .bnav-item{text-align:center;padding:6px 8px;color:var(--muted);font-size:.7rem;cursor:pointer;flex:1}
+  .bottom-nav .bnav-item.active{color:var(--accent2)}
+  .bottom-nav .bnav-item .bnav-icon{font-size:1.3rem;display:block;margin-bottom:2px}
+  .grid2{grid-template-columns:1fr}
+  .grid4{grid-template-columns:1fr 1fr}
+  h1{font-size:1.4rem}
+}
 
-    .choice-card {
-      width: 100%;
-      max-width: 400px;
-      background: var(--card);
-      border: 2px solid #334155;
-      border-radius: 16px;
-      padding: 20px;
-      cursor: pointer;
-      transition: border-color 0.2s, transform 0.1s;
-      -webkit-tap-highlight-color: transparent;
-      text-align: center;
-    }
-    .choice-card:active { transform: scale(0.98); }
-    .choice-card:hover { border-color: #475569; }
-    .choice-card.highlight { border-color: var(--blue); background: rgba(59,130,246,0.05); }
-    .choice-card .card-icon { font-size: 2rem; margin-bottom: 8px; }
-    .choice-card .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
-    .choice-card .card-desc { font-size: 0.85rem; color: var(--muted); }
+/* Login */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:var(--card);border-radius:var(--radius);padding:40px;max-width:380px;width:100%;text-align:center}
 
-    .or-divider {
-      color: var(--muted);
-      font-size: 0.85rem;
-      position: relative;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-    }
-    .or-divider::before, .or-divider::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      height: 1px;
-      background: #334155;
-      width: 40%;
-    }
-    .or-divider::before { right: 0; }
-    .or-divider::after { left: 0; }
+/* Counter ring */
+.counter-ring{position:relative;width:180px;height:180px;margin:0 auto}
+.counter-ring svg{transform:rotate(-90deg)}
+.counter-ring .ring-bg{fill:none;stroke:var(--border);stroke-width:10}
+.counter-ring .ring-fg{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .5s,stroke .3s}
+.counter-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.counter-num{font-size:2.5rem;font-weight:700;line-height:1}
+.counter-label{font-size:.8rem;color:var(--muted)}
 
-    /* Code check-in screen */
-    .code-screen {
-      justify-content: center;
-      align-items: center;
-      gap: 20px;
-    }
-    .code-screen .back-link {
-      color: var(--muted);
-      font-size: 0.85rem;
-      cursor: pointer;
-      text-decoration: underline;
-    }
+/* Stat boxes */
+.stat-box{text-align:center;padding:12px;background:var(--bg);border-radius:8px}
+.stat-num{font-size:1.6rem;font-weight:700}
+.stat-label{font-size:.75rem;color:var(--muted)}
 
-    /* Walk-in screen */
-    .walkin-screen {
-      justify-content: center;
-      align-items: center;
-      gap: 20px;
-    }
-    .walkin-screen .back-link {
-      color: var(--muted);
-      font-size: 0.85rem;
-      cursor: pointer;
-      text-decoration: underline;
-    }
+/* Guest row */
+.guest-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:6px}
+.guest-info{flex:1}
+.guest-name{font-weight:600}
+.guest-meta{font-size:.8rem;color:var(--muted)}
 
-    .form-group {
-      width: 100%;
-      max-width: 400px;
-    }
-    .form-group label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: 600;
-      font-size: 1rem;
-    }
-    .form-group input {
-      width: 100%;
-      padding: 16px 20px;
-      background: var(--card);
-      border: 2px solid #475569;
-      border-radius: 14px;
-      color: var(--text);
-      font-size: 1.1rem;
-      text-align: right;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .form-group input.code-input {
-      text-align: center;
-      direction: ltr;
-      letter-spacing: 4px;
-      font-size: 1.4rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .form-group input:focus { border-color: #60a5fa; }
+/* Slots */
+.slot-card{background:var(--bg);border-radius:8px;padding:10px 14px;text-align:center}
+.slot-time{font-size:.85rem;font-weight:600}
+.slot-count{font-size:1.3rem;font-weight:700;margin:4px 0}
 
-    .btn-action {
-      width: 100%;
-      max-width: 400px;
-      padding: 20px;
-      color: white;
-      border: none;
-      border-radius: 16px;
-      font-size: 1.3rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.1s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .btn-action:active { transform: scale(0.97); }
-    .btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-action.green { background: linear-gradient(135deg, #22c55e, #16a34a); }
-    .btn-action.blue { background: linear-gradient(135deg, var(--blue), #2563eb); }
+/* Registration page */
+.reg-hero{background:linear-gradient(135deg,#1e3a5f,#0f172a);border-radius:var(--radius);padding:30px;text-align:center;margin-bottom:20px;border:1px solid var(--border)}
 
-    .error-msg {
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--red);
-      padding: 12px 16px;
-      border-radius: 10px;
-      font-size: 0.9rem;
-      text-align: center;
-      width: 100%;
-      max-width: 400px;
-      display: none;
-    }
-    .error-msg.show { display: block; }
+/* Check-in */
+.checkin-input{font-size:1.8rem;text-align:center;letter-spacing:4px;padding:16px;text-transform:uppercase}
+.checkin-result{padding:20px;border-radius:var(--radius);text-align:center;margin-top:16px}
 
-    .prereg-badge {
-      display: inline-block;
-      background: rgba(59,130,246,0.15);
-      color: var(--blue);
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:16px;overflow-x:auto}
+.tab{padding:8px 16px;border-radius:8px;cursor:pointer;white-space:nowrap;background:var(--card2);color:var(--muted);font-size:.9rem}
+.tab.active{background:var(--accent);color:#fff}
 
-    .walkin-badge {
-      display: inline-block;
-      background: rgba(34,197,94,0.15);
-      color: var(--green);
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
+/* Timeline */
+.timeline-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin:12px 0}
+.timeline-fill{height:100%;background:var(--green);border-radius:4px;transition:width .5s}
 
-    /* Active screen */
-    .active-screen {
-      justify-content: center;
-      align-items: center;
-      gap: 20px;
-      text-align: center;
-    }
-    .active-check { font-size: 5rem; }
-    .active-name { font-size: 1.5rem; font-weight: 700; }
-    .active-status { font-size: 1rem; color: var(--green); font-weight: 600; }
-    .active-timer {
-      font-size: 2.5rem;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      color: var(--muted);
-      direction: ltr;
-    }
-    .active-timer-label { font-size: 0.85rem; color: var(--muted); }
-    .btn-checkout {
-      width: 100%;
-      max-width: 400px;
-      padding: 20px;
-      background: linear-gradient(135deg, #f97316, #ea580c);
-      color: white;
-      border: none;
-      border-radius: 16px;
-      font-size: 1.3rem;
-      font-weight: 700;
-      cursor: pointer;
-      margin-top: 20px;
-      transition: transform 0.1s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .btn-checkout:active { transform: scale(0.97); }
+/* Toast */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);padding:12px 24px;border-radius:8px;z-index:9999;font-weight:600;animation:toastIn .3s}
+.toast.success{border-color:var(--green);color:var(--green)}
+.toast.error{border-color:var(--red);color:var(--red)}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
-    /* Done screen */
-    .done-screen {
-      justify-content: center;
-      align-items: center;
-      gap: 16px;
-      text-align: center;
-    }
-    .done-icon { font-size: 4rem; }
-    .done-text { font-size: 1.2rem; font-weight: 600; }
-    .done-duration { font-size: 1rem; color: var(--muted); }
-    .btn-again {
-      padding: 14px 32px;
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid #475569;
-      border-radius: 12px;
-      font-size: 1rem;
-      cursor: pointer;
-      margin-top: 20px;
-    }
+/* Footer */
+.footer{text-align:center;padding:30px 16px;color:var(--muted);font-size:.8rem;border-top:1px solid var(--border);margin-top:40px}
 
-    /* Full screen */
-    .full-screen {
-      justify-content: center;
-      align-items: center;
-      gap: 16px;
-      text-align: center;
-    }
-    .full-icon { font-size: 4rem; }
-    .full-text { font-size: 1.2rem; color: var(--red); font-weight: 600; }
-    .full-sub { color: var(--muted); font-size: 0.95rem; }
-  </style>
+.hidden{display:none!important}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;margin-bottom:4px;font-size:.85rem;color:var(--muted)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:500px){.form-row{grid-template-columns:1fr}}
+
+.event-group-title{font-size:.9rem;color:var(--muted);margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+.event-group-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.share-box{background:var(--bg);border-radius:8px;padding:12px;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.share-box input{flex:1;font-size:.8rem}
+
+.slot-selectable{cursor:pointer;border:2px solid transparent;transition:border-color .2s}
+.slot-selectable:hover{border-color:var(--accent)}
+.slot-selectable.selected{border-color:var(--accent);background:rgba(59,130,246,.1)}
+.slot-selectable.disabled{opacity:.5;cursor:default;pointer-events:none}
+</style>
 </head>
 <body>
-  <div class="header">
-    <h1>ברוכים הבאים לאירוע</h1>
-    <p>בחרו את אופן הכניסה</p>
+
+<!-- Admin App Shell -->
+<div id="app" class="hidden">
+  <nav class="sidebar">
+    <div class="logo">&#127880; טופי</div>
+    <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')"><span>&#128202;</span> לוח בקרה</div>
+    <div class="nav-item" data-page="checkin" onclick="navigateTo('checkin')"><span>&#128179;</span> צ'ק-אין</div>
+    <div class="nav-item" data-page="live" onclick="navigateTo('live')"><span>&#128308;</span> שידור חי</div>
+    <div class="nav-item" data-page="members" onclick="navigateTo('members')"><span>&#128101;</span> חברי מועדון</div>
+    <div style="flex:1"></div>
+    <div class="nav-item" onclick="logout()" style="color:var(--red)"><span>&#128682;</span> יציאה</div>
+  </nav>
+  <div class="bottom-nav">
+    <div class="bnav-item active" data-page="dashboard" onclick="navigateTo('dashboard')"><span class="bnav-icon">&#128202;</span>בקרה</div>
+    <div class="bnav-item" data-page="checkin" onclick="navigateTo('checkin')"><span class="bnav-icon">&#128179;</span>צ'ק-אין</div>
+    <div class="bnav-item" data-page="live" onclick="navigateTo('live')"><span class="bnav-icon">&#128308;</span>חי</div>
+    <div class="bnav-item" data-page="members" onclick="navigateTo('members')"><span class="bnav-icon">&#128101;</span>מועדון</div>
   </div>
+  <div class="main" id="main-content"></div>
+</div>
 
-  <!-- Screen 1: Choice - pre-registered or walk-in -->
-  <div class="screen choice-screen active" id="screenChoice">
-    <div class="choice-icon">👋</div>
-    <div class="choice-text">איך תרצו להיכנס?</div>
-
-    <div class="choice-card highlight" onclick="showCodeScreen()">
-      <div class="card-icon">🎫</div>
-      <div class="card-title">נרשמתי מראש</div>
-      <div class="card-desc">יש לי קוד הרשמה - כניסה ישירה</div>
+<!-- Login -->
+<div id="login-screen" class="hidden">
+  <div class="login-wrap">
+    <div class="login-box">
+      <div style="font-size:2.5rem;margin-bottom:12px">&#127880;</div>
+      <h1>טופי - הפקות אירועים</h1>
+      <p class="text-muted mb-2">הזן סיסמת מנהל</p>
+      <input type="password" id="login-token" placeholder="טוקן מנהל" style="margin-bottom:12px" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn btn-block" onclick="doLogin()">כניסה</button>
+      <p id="login-error" class="text-red mt-1" style="font-size:.85rem"></p>
     </div>
-
-    <div class="or-divider">או</div>
-
-    <div class="choice-card" onclick="showWalkinScreen()">
-      <div class="card-icon">🚶</div>
-      <div class="card-title">כניסה ללא הרשמה</div>
-      <div class="card-desc">בכפוף למקומות פנויים</div>
-    </div>
   </div>
+</div>
 
-  <!-- Screen 2a: Code check-in -->
-  <div class="screen code-screen" id="screenCode">
-    <div style="font-size: 3rem; text-align: center;">🎫</div>
-    <div style="text-align: center; font-size: 1.1rem; font-weight: 600;">הזינו את קוד ההרשמה</div>
-    <div class="form-group">
-      <input type="text" id="codeInput" class="code-input" placeholder="ABCD1234" autocomplete="off" maxlength="8" />
-    </div>
-    <div class="error-msg" id="codeError"></div>
-    <button class="btn-action blue" id="btnCodeCheckin" onclick="doCodeCheckin()">כניסה עם קוד</button>
-    <span class="back-link" onclick="showChoice()">חזרה</span>
-  </div>
+<!-- Public Registration -->
+<div id="public-register" class="hidden" style="max-width:600px;margin:0 auto;padding:20px"></div>
 
-  <!-- Screen 2b: Walk-in check-in -->
-  <div class="screen walkin-screen" id="screenWalkin">
-    <div style="font-size: 3rem; text-align: center;">🚶</div>
-    <div style="text-align: center; font-size: 1.1rem; font-weight: 600;">כניסה ללא הרשמה מראש</div>
-    <div class="form-group">
-      <label>שם מלא</label>
-      <input type="text" id="nameInput" placeholder="הכניסו את שמכם" autocomplete="name" />
-    </div>
-    <div class="error-msg" id="walkinError"></div>
-    <button class="btn-action green" id="btnWalkin" onclick="doWalkinCheckin()">כניסה לאירוע</button>
-    <span class="back-link" onclick="showChoice()">חזרה</span>
-  </div>
+<!-- Client View -->
+<div id="client-view" class="hidden" style="max-width:600px;margin:0 auto;padding:20px"></div>
 
-  <!-- Screen 3: Currently checked in -->
-  <div class="screen active-screen" id="screenActive">
-    <div class="active-check">✅</div>
-    <div class="active-name" id="activeName"></div>
-    <div id="activeBadge"></div>
-    <div class="active-status">נוכח/ת באירוע</div>
-    <div class="active-timer" id="activeTimer">00:00:00</div>
-    <div class="active-timer-label">זמן שהייה</div>
-    <button class="btn-checkout" onclick="doCheckout()">יציאה מהאירוע</button>
-  </div>
+<script>
+// ===================== STATE =====================
+let adminToken = localStorage.getItem('eventGateAdminToken') || '';
+let currentPage = 'dashboard';
+let currentEventId = null;
+let refreshTimer = null;
+let allEvents = [];
 
-  <!-- Screen 4: Done -->
-  <div class="screen done-screen" id="screenDone">
-    <div class="done-icon">👏</div>
-    <div class="done-text">תודה שהגעתם!</div>
-    <div class="done-duration" id="doneDuration"></div>
-    <button class="btn-again" onclick="showChoice()">כניסה מחדש</button>
-  </div>
+// ===================== INIT =====================
+(function init() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('event')) {
+    showPublicRegistration(params.get('event'));
+  } else if (params.get('client')) {
+    showClientView(params.get('client'));
+  } else if (adminToken) {
+    verifyAdmin();
+  } else {
+    showLogin();
+  }
+})();
 
-  <!-- Screen 5: Full -->
-  <div class="screen full-screen" id="screenFull">
-    <div class="full-icon">🚫</div>
-    <div class="full-text">האירוע מלא כרגע</div>
-    <div class="full-sub">נסו שוב בעוד מספר דקות</div>
-    <button class="btn-again" onclick="showChoice()" style="margin-top: 30px;">נסו שוב</button>
-  </div>
+// ===================== API =====================
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (adminToken && !opts.noAuth) headers['x-admin-token'] = adminToken;
+  const fetchOpts = { ...opts, headers };
+  if (opts.body) fetchOpts.body = JSON.stringify(opts.body);
+  const res = await fetch(path, fetchOpts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'שגיאה');
+  return data;
+}
 
-  <!-- Screen 6: Not configured -->
-  <div class="screen full-screen" id="screenNotConfigured">
-    <div class="full-icon">🔧</div>
-    <div class="full-text" style="color: var(--muted);">האירוע טרם הוגדר</div>
-    <div class="full-sub">הכניסה תיפתח בקרוב</div>
-  </div>
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
 
-  <script>
-    let guestId = null;
-    let guestName = '';
-    let guestType = '';
-    let checkinTime = null;
-    let timerInterval = null;
+// ===================== UTILS =====================
+function formatPhone(p) {
+  if (!p) return '';
+  let n = p.replace(/[^0-9]/g, '');
+  if (n.startsWith('0')) n = '972' + n.slice(1);
+  return n;
+}
+function waLink(phone, text) {
+  return 'https://wa.me/' + formatPhone(phone) + '?text=' + encodeURIComponent(text);
+}
+function wazeLink(addr) {
+  return 'https://waze.com/ul?q=' + encodeURIComponent(addr);
+}
+function calLink(name, startTime, totalMin, addr) {
+  const s = new Date(startTime);
+  const e = new Date(startTime + (totalMin || 60) * 60000);
+  const fmt = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(name) + '&dates=' + fmt(s) + '/' + fmt(e) + '&location=' + encodeURIComponent(addr || '');
+}
+function fmtDate(d) {
+  if (!d) return '';
+  const p = d.split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+}
+function isToday(dateStr) {
+  return dateStr === new Date().toISOString().split('T')[0];
+}
+function isPast(dateStr) {
+  return dateStr < new Date().toISOString().split('T')[0];
+}
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => toast('הועתק!')).catch(() => {});
+}
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
 
-    // Restore session
-    const saved = localStorage.getItem('eventGateGuest');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        guestId = data.id;
-        guestName = data.name;
-        guestType = data.type || 'walkin';
-        checkinTime = data.checkinTime;
-        showActive();
-      } catch {}
+// ===================== AUTH =====================
+function showLogin() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
+
+async function doLogin() {
+  const token = document.getElementById('login-token').value.trim();
+  if (!token) return;
+  adminToken = token;
+  try {
+    await api('/api/events');
+    localStorage.setItem('eventGateAdminToken', token);
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    navigateTo('dashboard');
+  } catch {
+    document.getElementById('login-error').textContent = 'טוקן שגוי';
+    adminToken = '';
+  }
+}
+
+async function verifyAdmin() {
+  try {
+    await api('/api/events');
+    document.getElementById('app').classList.remove('hidden');
+    navigateTo('dashboard');
+  } catch {
+    adminToken = '';
+    localStorage.removeItem('eventGateAdminToken');
+    showLogin();
+  }
+}
+
+function logout() {
+  adminToken = '';
+  localStorage.removeItem('eventGateAdminToken');
+  stopRefresh();
+  document.getElementById('app').classList.add('hidden');
+  showLogin();
+}
+
+// ===================== NAVIGATION =====================
+function stopRefresh() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } }
+
+function navigateTo(page, data) {
+  stopRefresh();
+  currentPage = page;
+  currentEventId = data || null;
+
+  document.querySelectorAll('.sidebar .nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  document.querySelectorAll('.bottom-nav .bnav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+
+  const routes = {
+    dashboard: renderDashboard,
+    setup: renderSetup,
+    manage: renderManage,
+    checkin: renderCheckin,
+    live: renderLive,
+    members: renderMembers
+  };
+  if (routes[page]) routes[page](data);
+}
+
+function setMain(html) {
+  document.getElementById('main-content').innerHTML = html +
+    '<div class="footer">' +
+      '<div style="margin-bottom:4px">&#127880; טופי - הפקות אירועים</div>' +
+      '<div>בן כהן 0523866819 | אורי ישי עמרן 052-2123345</div>' +
+      '<div style="margin-top:4px">&copy; ' + new Date().getFullYear() + ' חברים של טופי בע״מ</div>' +
+    '</div>';
+}
+
+// ===================== COUNTER RING =====================
+function counterRing(current, max, size) {
+  size = size || 180;
+  const r = (size - 20) / 2;
+  const c = Math.PI * 2 * r;
+  const pct = Math.min(current / Math.max(max, 1), 1);
+  const offset = c * (1 - pct);
+  const color = pct < 0.7 ? 'var(--green)' : pct < 0.9 ? 'var(--yellow)' : 'var(--red)';
+  const half = size / 2;
+  return '<div class="counter-ring" style="width:' + size + 'px;height:' + size + 'px">' +
+    '<svg width="' + size + '" height="' + size + '"><circle class="ring-bg" cx="' + half + '" cy="' + half + '" r="' + r + '"/>' +
+    '<circle class="ring-fg" cx="' + half + '" cy="' + half + '" r="' + r + '" stroke="' + color + '" stroke-dasharray="' + c + '" stroke-dashoffset="' + offset + '"/></svg>' +
+    '<div class="counter-center"><div class="counter-num">' + current + '</div><div class="counter-label">מתוך ' + max + '</div></div></div>';
+}
+
+function statusMsg(current, max) {
+  const pct = current / Math.max(max, 1);
+  if (pct >= 1) return '<span class="text-red">&#9888; מלא!</span>';
+  if (pct >= 0.9) return '<span class="text-red">כמעט מלא!</span>';
+  if (pct >= 0.7) return '<span class="text-yellow">מתמלא</span>';
+  return '<span class="text-green">&#10003; פתוח - יש מקום</span>';
+}
+
+// ===================== DASHBOARD =====================
+async function renderDashboard() {
+  setMain('<div class="text-center text-muted mt-3">&#8987; טוען...</div>');
+  try {
+    const data = await api('/api/events');
+    allEvents = data.events || [];
+    const todayEvs = allEvents.filter(e => isToday(e.date)).sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+    const upcoming = allEvents.filter(e => !isToday(e.date) && !isPast(e.date)).sort((a, b) => a.date.localeCompare(b.date));
+    const past = allEvents.filter(e => isPast(e.date)).sort((a, b) => b.date.localeCompare(a.date));
+
+    let html = '<div class="flex justify-between items-center mb-2">' +
+      '<h1>&#128202; לוח בקרה</h1>' +
+      '<button class="btn" onclick="navigateTo(\'setup\')">+ אירוע חדש</button></div>';
+
+    function evCards(evs, title, badgeCls) {
+      if (!evs.length) return '';
+      let h = '<div class="event-group-title">' + title + '</div>';
+      evs.forEach(ev => {
+        const regLink = location.origin + location.pathname + '?event=' + ev.id;
+        const clientLink = location.origin + location.pathname + '?client=' + ev.clientToken;
+        const waMsg = 'היי ' + (ev.contactName || ev.clientName) + '!' +
+          '\n\nקישור צפייה באירוע:\n' + clientLink +
+          '\n\nקישור הרשמה:\n' + regLink +
+          '\n\nטופי - הפקות אירועים';
+        h += '<div class="card">' +
+          '<div class="flex justify-between items-center mb-1"><div>' +
+          '<h3>' + esc(ev.eventName || 'אירוע') + '</h3>' +
+          '<div class="text-muted" style="font-size:.85rem">' + esc(ev.clientName) + ' | ' + fmtDate(ev.date) + '</div>' +
+          '</div>' + (badgeCls ? '<span class="badge ' + badgeCls + '">' + title + '</span>' : '') + '</div>' +
+          '<div class="flex gap-1 flex-wrap mt-1" style="font-size:.8rem">' +
+          '<span class="badge badge-blue">&#128101; פעילים: ' + (ev.activeCount || 0) + '</span>' +
+          '<span class="badge badge-muted">&#128203; נרשמו: ' + (ev.preRegCount || 0) + '</span></div>' +
+          '<div class="flex gap-1 flex-wrap mt-2">' +
+          '<button class="btn btn-sm" onclick="navigateTo(\'manage\',\'' + ev.id + '\')">&#128736; ניהול</button>' +
+          '<button class="btn-outline btn-sm" onclick="navigateTo(\'setup\',\'' + ev.id + '\')">&#9998; עריכה</button>' +
+          (ev.contactPhone ? '<a href="' + waLink(ev.contactPhone, waMsg) + '" target="_blank" class="btn-sm btn-green" style="display:inline-block;text-decoration:none;padding:6px 14px;border-radius:8px">&#128172; וואטסאפ</a>' : '') +
+          '</div></div>';
+      });
+      return h;
     }
 
-    // Check if event is configured
-    const urlCode = new URLSearchParams(window.location.search).get('code');
-    if (!guestId) {
-      fetch('/api/slots').then(r => r.json()).then(data => {
-        if (data.configured === false) {
-          showScreen('screenNotConfigured');
-        } else if (urlCode) {
-          showCodeScreen();
-          document.getElementById('codeInput').value = urlCode.toUpperCase();
-          setTimeout(() => doCodeCheckin(), 300);
-        }
-      }).catch(() => {});
-    }
+    html += evCards(todayEvs, 'היום', 'badge-green');
+    html += evCards(upcoming, 'קרוב', 'badge-blue');
+    html += evCards(past, 'עבר', 'badge-muted');
 
-    function showScreen(id) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
+    if (!allEvents.length) {
+      html += '<div class="card text-center text-muted"><p>אין אירועים עדיין</p><button class="btn mt-2" onclick="navigateTo(\'setup\')">צור אירוע ראשון</button></div>';
     }
+    setMain(html);
+  } catch (e) {
+    setMain('<div class="card text-center text-red">' + esc(e.message) + '</div>');
+  }
+}
 
-    function showChoice() {
-      clearSession();
-      // Clean URL params
-      history.replaceState({}, '', '/');
-      showScreen('screenChoice');
+// ===================== EVENT SETUP =====================
+async function renderSetup(eventId) {
+  let ev = null;
+  if (eventId) {
+    try { ev = await api('/api/events/' + eventId + '/full'); } catch {}
+  }
+  const isEdit = !!ev;
+  const v = function(f) { return ev ? (ev[f] || '') : ''; };
+  const timeVal = ev ? new Date(ev.startTime).toTimeString().slice(0, 5) : '';
+
+  let html = '<div class="flex justify-between items-center"><h1>' + (isEdit ? '&#9998; עריכת אירוע' : '&#10024; אירוע חדש') + '</h1>' +
+    '<button class="btn-outline btn-sm" onclick="navigateTo(\'dashboard\')">&#8592; חזרה</button></div>' +
+    '<div class="card mt-2">' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label>שם לקוח</label><input id="f-clientName" value="' + esc(v('clientName')) + '"></div>' +
+    '<div class="form-group"><label>שם אירוע</label><input id="f-eventName" value="' + esc(v('eventName')) + '"></div></div>' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label>איש קשר</label><input id="f-contactName" value="' + esc(v('contactName')) + '"></div>' +
+    '<div class="form-group"><label>טלפון איש קשר</label><input id="f-contactPhone" value="' + esc(v('contactPhone')) + '" type="tel" dir="ltr"></div></div>' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label>תאריך</label><input id="f-date" type="date" value="' + v('date') + '"></div>' +
+    '<div class="form-group"><label>שעה</label><input id="f-time" type="time" value="' + timeVal + '"></div></div>' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label>מספר חלונות</label><input id="f-numSlots" type="number" min="1" max="20" value="' + (ev ? ev.numSlots : 5) + '"></div>' +
+    '<div class="form-group"><label>משך חלון (דקות)</label><input id="f-slotDurationMin" type="number" min="5" value="' + (ev ? ev.slotDurationMin : 30) + '"></div></div>' +
+    '<div class="form-group"><label>קיבולת מקסימלית</label><input id="f-maxCapacity" type="number" min="1" value="' + (ev ? ev.maxCapacity : 50) + '"></div>' +
+    '<div class="form-group"><label>כתובת האירוע</label><input id="f-eventAddress" value="' + esc(v('eventAddress')) + '"></div>' +
+    '<div class="form-group"><label>אטרקציות</label><textarea id="f-attractions">' + esc(v('attractions')) + '</textarea></div>' +
+    '<button class="btn mt-1" onclick="previewSlots()">&#128064; תצוגה מקדימה של חלונות</button>' +
+    '<div id="slot-preview" class="mt-2"></div>' +
+    '<div class="flex gap-1 mt-2">' +
+    '<button class="btn btn-block btn-green" onclick="saveEvent(\'' + (eventId || '') + '\')">&#128190; ' + (isEdit ? 'עדכון' : 'שמירה') + '</button>' +
+    '<button class="btn-outline btn-block" onclick="navigateTo(\'dashboard\')">ביטול</button></div>' +
+    (isEdit ? '<button class="btn-red btn-block mt-2 btn-sm" onclick="deleteEvent(\'' + eventId + '\')">&#128465; מחק אירוע</button>' : '') +
+    '</div><div id="share-section"></div>';
+  setMain(html);
+}
+
+function previewSlots() {
+  const date = document.getElementById('f-date').value;
+  const time = document.getElementById('f-time').value;
+  const n = parseInt(document.getElementById('f-numSlots').value) || 5;
+  const d = parseInt(document.getElementById('f-slotDurationMin').value) || 30;
+  if (!date || !time) { toast('הזן תאריך ושעה', 'error'); return; }
+  const start = new Date(date + 'T' + time).getTime();
+  let html = '<div class="grid3">';
+  for (let i = 0; i < n; i++) {
+    const s = start + i * d * 60000;
+    const e = s + d * 60000;
+    html += '<div class="slot-card"><div class="slot-time">' + fmtTime(s) + ' - ' + fmtTime(e) + '</div><div class="text-muted" style="font-size:.75rem">חלון ' + (i + 1) + '</div></div>';
+  }
+  html += '</div>';
+  document.getElementById('slot-preview').innerHTML = html;
+}
+
+async function saveEvent(editId) {
+  const body = {
+    clientName: document.getElementById('f-clientName').value,
+    eventName: document.getElementById('f-eventName').value,
+    contactName: document.getElementById('f-contactName').value,
+    contactPhone: document.getElementById('f-contactPhone').value,
+    date: document.getElementById('f-date').value,
+    time: document.getElementById('f-time').value,
+    numSlots: parseInt(document.getElementById('f-numSlots').value),
+    slotDurationMin: parseInt(document.getElementById('f-slotDurationMin').value),
+    maxCapacity: parseInt(document.getElementById('f-maxCapacity').value),
+    eventAddress: document.getElementById('f-eventAddress').value,
+    attractions: document.getElementById('f-attractions').value,
+  };
+  try {
+    let result;
+    if (editId) {
+      result = await api('/api/events/' + editId, { method: 'PUT', body: body });
+    } else {
+      result = await api('/api/events', { method: 'POST', body: body });
     }
+    toast(editId ? 'אירוע עודכן!' : 'אירוע נוצר!');
+    const ev = result.event;
+    const regLink = location.origin + location.pathname + '?event=' + ev.id;
+    const clientLink = location.origin + location.pathname + '?client=' + ev.clientToken;
+    document.getElementById('share-section').innerHTML =
+      '<div class="card mt-2"><h3>&#128279; קישורי שיתוף</h3>' +
+      '<div class="mb-1 text-muted" style="font-size:.85rem">קישור הרשמה</div>' +
+      '<div class="share-box"><input value="' + regLink + '" readonly onclick="this.select()">' +
+      '<button class="btn btn-sm" onclick="copyText(\'' + regLink + '\')">&#128203;</button>' +
+      '<a href="' + waLink('', 'הנה קישור הרשמה לאירוע: ' + regLink) + '" target="_blank" class="btn-green btn-sm" style="display:inline-block;padding:6px 12px;border-radius:8px;text-decoration:none">&#128172;</a></div>' +
+      '<div class="mb-1 text-muted" style="font-size:.85rem">קישור צפייה ללקוח</div>' +
+      '<div class="share-box"><input value="' + clientLink + '" readonly onclick="this.select()">' +
+      '<button class="btn btn-sm" onclick="copyText(\'' + clientLink + '\')">&#128203;</button>' +
+      '<a href="' + waLink(ev.contactPhone || '', 'היי! הנה קישור צפייה באירוע שלך: ' + clientLink) + '" target="_blank" class="btn-green btn-sm" style="display:inline-block;padding:6px 12px;border-radius:8px;text-decoration:none">&#128172;</a></div>' +
+      '<button class="btn btn-block mt-1" onclick="navigateTo(\'manage\',\'' + ev.id + '\')">&#128736; ניהול אירוע</button></div>';
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
 
-    function showCodeScreen() {
-      showScreen('screenCode');
-      document.getElementById('codeInput').value = urlCode ? urlCode.toUpperCase() : '';
-      document.getElementById('codeError').classList.remove('show');
-      document.getElementById('codeInput').focus();
-    }
+async function deleteEvent(id) {
+  if (!confirm('למחוק את האירוע? פעולה זו בלתי הפיכה.')) return;
+  try {
+    await api('/api/events/' + id, { method: 'DELETE' });
+    toast('אירוע נמחק');
+    navigateTo('dashboard');
+  } catch (e) { toast(e.message, 'error'); }
+}
 
-    function showWalkinScreen() {
-      showScreen('screenWalkin');
-      document.getElementById('nameInput').value = '';
-      document.getElementById('walkinError').classList.remove('show');
-      document.getElementById('nameInput').focus();
-    }
+// ===================== EVENT MANAGEMENT =====================
+async function renderManage(eventId) {
+  if (!eventId) { navigateTo('dashboard'); return; }
+  currentEventId = eventId;
 
-    function showActive() {
-      document.getElementById('activeName').textContent = guestName;
-      const badgeEl = document.getElementById('activeBadge');
-      if (guestType === 'preregistered') {
-        badgeEl.innerHTML = '<span class="prereg-badge">נרשם/ה מראש</span>';
-      } else {
-        badgeEl.innerHTML = '<span class="walkin-badge">אורח/ת</span>';
+  async function load() {
+    try {
+      const ev = await api('/api/events/' + eventId + '/full');
+      const guests = Object.values(ev.guests || {});
+      const preRegs = Object.values(ev.preRegs || {});
+      const active = guests.filter(g => !g.checkoutTime);
+      const history = guests.filter(g => g.checkoutTime);
+      const ac = active.reduce((s, g) => s + (g.groupSize || 1), 0);
+      const totalVisited = guests.reduce((s, g) => s + (g.groupSize || 1), 0);
+      const pending = preRegs.filter(r => !r.arrived);
+      const walkins = active.filter(g => g.type === 'walkin');
+
+      const slotRegs = {};
+      (ev.slots || []).forEach(s => { slotRegs[s.index] = 0; });
+      preRegs.forEach(r => { slotRegs[r.slotIndex] = (slotRegs[r.slotIndex] || 0) + (r.participants || 1); });
+
+      let html = '<div class="flex justify-between items-center mb-1"><div>' +
+        '<h1>' + esc(ev.eventName || 'אירוע') + '</h1>' +
+        '<div class="text-muted">' + esc(ev.clientName) + ' | ' + fmtDate(ev.date) + ' | ' + fmtTime(ev.startTime) + '</div></div>' +
+        '<button class="btn-outline btn-sm" onclick="navigateTo(\'dashboard\')">&#8592; חזרה</button></div>' +
+
+        '<div class="text-center mt-2">' + counterRing(ac, ev.maxCapacity) +
+        '<div class="mt-1" style="font-size:1.1rem">' + statusMsg(ac, ev.maxCapacity) + '</div></div>' +
+
+        '<div class="grid4 mt-2">' +
+        '<div class="stat-box"><div class="stat-num">' + totalVisited + '</div><div class="stat-label">ביקרו סה"כ</div></div>' +
+        '<div class="stat-box"><div class="stat-num text-green">' + preRegs.length + '</div><div class="stat-label">נרשמו</div></div>' +
+        '<div class="stat-box"><div class="stat-num text-yellow">' + pending.length + '</div><div class="stat-label">ממתינים</div></div>' +
+        '<div class="stat-box"><div class="stat-num" style="color:var(--orange)">' + walkins.length + '</div><div class="stat-label">ווק-אין</div></div></div>' +
+
+        '<h3 class="mt-3 mb-1">&#128339; חלונות זמן</h3><div class="grid3">';
+      (ev.slots || []).forEach(s => {
+        html += '<div class="slot-card"><div class="slot-time">' + s.label + '</div><div class="slot-count">' + (slotRegs[s.index] || 0) + '</div><div class="text-muted" style="font-size:.7rem">נרשמו</div></div>';
+      });
+      html += '</div>';
+
+      // Active guests
+      if (active.length) {
+        html += '<h3 class="mt-3 mb-1">&#127939; פעילים כרגע (' + active.length + ')</h3>';
+        active.forEach(g => {
+          html += '<div class="guest-row"><div class="guest-info"><div class="guest-name">' + esc(g.name) +
+            ' <span class="badge ' + (g.type === 'walkin' ? 'badge-yellow' : 'badge-blue') + '" style="font-size:.65rem">' +
+            (g.type === 'walkin' ? 'ווק-אין' : g.regCode || 'נרשם') + '</span></div>' +
+            '<div class="guest-meta">&#128101; ' + (g.groupSize || 1) + ' | ' + fmtTime(g.checkinTime) + '</div></div>' +
+            '<button class="btn-red btn-sm" onclick="doCheckout(\'' + eventId + '\',\'' + g.id + '\')">יציאה</button></div>';
+        });
       }
-      showScreen('screenActive');
-      startTimer();
+
+      // Pending pre-regs
+      if (pending.length) {
+        html += '<h3 class="mt-3 mb-1">&#128203; ממתינים לצ\'ק-אין (' + pending.length + ')</h3>';
+        pending.forEach(r => {
+          html += '<div class="guest-row"><div class="guest-info"><div class="guest-name">' + esc(r.name) +
+            ' <span class="badge badge-muted" style="font-size:.65rem">' + r.code + '</span></div>' +
+            '<div class="guest-meta">&#128101; ' + (r.participants || 1) + ' | חלון ' + (r.slotIndex + 1) +
+            (r.phone ? ' | ' + r.phone : '') + '</div></div>' +
+            '<div class="flex gap-1">' +
+            '<button class="btn btn-sm" onclick="quickCheckin(\'' + eventId + '\',\'' + r.code + '\',' + (r.participants || 1) + ')">&#10003; כניסה</button>' +
+            '<button class="btn-red btn-sm" onclick="releaseReg(\'' + eventId + '\',\'' + r.code + '\')">&#128465;</button>' +
+            '</div></div>';
+        });
+      }
+
+      // History
+      if (history.length) {
+        html += '<h3 class="mt-3 mb-1">&#128214; היסטוריה (' + history.length + ')</h3>';
+        history.slice().sort((a, b) => b.checkoutTime - a.checkoutTime).slice(0, 30).forEach(g => {
+          html += '<div class="guest-row" style="opacity:.6"><div class="guest-info"><div class="guest-name">' + esc(g.name) + '</div>' +
+            '<div class="guest-meta">כניסה: ' + fmtTime(g.checkinTime) + ' | יציאה: ' + fmtTime(g.checkoutTime) + ' | &#128101; ' + (g.groupSize || 1) + '</div></div></div>';
+        });
+      }
+
+      setMain(html);
+    } catch (e) {
+      setMain('<div class="card text-red text-center">' + esc(e.message) + '</div>');
+    }
+  }
+
+  await load();
+  refreshTimer = setInterval(load, 3000);
+}
+
+async function doCheckout(eventId, guestId) {
+  try {
+    await api('/api/events/' + eventId + '/checkout/' + guestId, { method: 'POST' });
+    toast('יציאה בוצעה');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function quickCheckin(eventId, code, groupSize) {
+  try {
+    await api('/api/events/' + eventId + '/checkin', { method: 'POST', body: { code: code, type: 'preregistered', groupSize: groupSize } });
+    toast('כניסה בוצעה!');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function releaseReg(eventId, code) {
+  if (!confirm('לבטל רישום זה?')) return;
+  try {
+    await api('/api/events/' + eventId + '/release/' + code, { method: 'POST' });
+    toast('רישום בוטל');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// ===================== CHECK-IN PAGE =====================
+async function renderCheckin() {
+  setMain('<div class="text-center text-muted mt-3">&#8987; טוען...</div>');
+  try {
+    const data = await api('/api/events');
+    const todayEvs = (data.events || []).filter(e => isToday(e.date));
+
+    if (!todayEvs.length) {
+      setMain('<h1>&#128179; צ\'ק-אין</h1><div class="card mt-2 text-center text-muted">אין אירועים היום</div>');
+      return;
     }
 
-    async function doCodeCheckin() {
-      const code = document.getElementById('codeInput').value.trim();
-      if (!code) {
-        showCodeError('נא להזין קוד');
+    let selectedId = todayEvs[0].id;
+
+    function render() {
+      const sel = todayEvs.find(e => e.id === selectedId) || todayEvs[0];
+      let html = '<h1>&#128179; צ\'ק-אין</h1>';
+
+      if (todayEvs.length > 1) {
+        html += '<div class="tabs mt-1">';
+        todayEvs.forEach(e => {
+          html += '<div class="tab ' + (e.id === selectedId ? 'active' : '') + '" onclick="window._ciSelect(\'' + e.id + '\')">' + esc(e.eventName) + '</div>';
+        });
+        html += '</div>';
+      }
+
+      html += '<div class="card mt-2 text-center"><h2>' + esc(sel.eventName) + '</h2>' +
+        '<div class="text-muted mb-2">' + esc(sel.clientName) + ' | פעילים: ' + (sel.activeCount || 0) + '/' + sel.maxCapacity + '</div></div>' +
+
+        '<div class="card"><h3>&#128179; קוד הרשמה / מספר טלפון</h3>' +
+        '<input class="checkin-input mt-1" id="checkin-code" placeholder="AB1234 / 052..." maxlength="20" dir="ltr" onkeydown="if(event.key===\'Enter\')submitCheckin(\'' + selectedId + '\')">' +
+        '<button class="btn btn-block btn-green mt-1" onclick="submitCheckin(\'' + selectedId + '\')">&#10003; צ\'ק-אין</button></div>' +
+
+        '<div class="card"><h3>&#128694; ווק-אין</h3>' +
+        '<div class="form-group mt-1"><label>שם</label><input id="walkin-name" placeholder="שם מלא"></div>' +
+        '<div class="form-group"><label>מספר אורחים</label><input id="walkin-size" type="number" min="1" value="1"></div>' +
+        '<button class="btn btn-block" onclick="submitWalkin(\'' + selectedId + '\')">&#10003; כניסה</button></div>' +
+
+        '<div id="checkin-result"></div>';
+
+      setMain(html);
+      setTimeout(function() { var el = document.getElementById('checkin-code'); if (el) el.focus(); }, 100);
+    }
+
+    window._ciSelect = function(id) { selectedId = id; render(); };
+    render();
+  } catch (e) {
+    setMain('<div class="card text-red">' + esc(e.message) + '</div>');
+  }
+}
+
+async function submitCheckin(eventId) {
+  const code = document.getElementById('checkin-code').value.trim();
+  if (!code) return;
+  const resultEl = document.getElementById('checkin-result');
+  try {
+    const res = await api('/api/events/' + eventId + '/checkin', { method: 'POST', body: { code: code, type: 'preregistered' } });
+    resultEl.innerHTML = '<div class="checkin-result" style="background:var(--green);color:#000">' +
+      '<div style="font-size:3rem">&#10003;</div><h2>' + esc(res.guest.name) + '</h2>' +
+      '<div>&#128101; ' + (res.guest.groupSize || 1) + ' אורחים</div></div>';
+    document.getElementById('checkin-code').value = '';
+    document.getElementById('checkin-code').focus();
+    setTimeout(function() { if (resultEl) resultEl.innerHTML = ''; }, 4000);
+  } catch (e) {
+    resultEl.innerHTML = '<div class="checkin-result" style="background:var(--red)">' +
+      '<div style="font-size:3rem">&#10007;</div><h2>' + esc(e.message) + '</h2></div>';
+    setTimeout(function() { if (resultEl) resultEl.innerHTML = ''; }, 4000);
+  }
+}
+
+async function submitWalkin(eventId) {
+  const name = document.getElementById('walkin-name').value.trim();
+  const size = parseInt(document.getElementById('walkin-size').value) || 1;
+  if (!name) { toast('הזן שם', 'error'); return; }
+  try {
+    const res = await api('/api/events/' + eventId + '/checkin', { method: 'POST', body: { name: name, groupSize: size, type: 'walkin' } });
+    toast(res.guest.name + ' נכנס/ה!');
+    document.getElementById('walkin-name').value = '';
+    document.getElementById('walkin-size').value = '1';
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// ===================== LIVE VIEW =====================
+async function renderLive() {
+  let selectedId = null;
+
+  async function load() {
+    try {
+      const data = await api('/api/events');
+      const todayEvs = (data.events || []).filter(e => isToday(e.date));
+
+      if (!todayEvs.length) {
+        setMain('<h1>&#128308; שידור חי</h1><div class="card mt-2 text-center text-muted">אין אירועים היום</div>');
         return;
       }
 
-      const btn = document.getElementById('btnCodeCheckin');
-      btn.disabled = true;
-      btn.textContent = 'נכנס...';
+      if (!selectedId || !todayEvs.find(e => e.id === selectedId)) selectedId = todayEvs[0].id;
 
-      try {
-        const res = await fetch('/api/checkin/code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }),
+      const ev = await api('/api/events/' + selectedId + '/full');
+      const guests = Object.values(ev.guests || {});
+      const preRegs = Object.values(ev.preRegs || {});
+      const active = guests.filter(g => !g.checkoutTime);
+      const ac = active.reduce((s, g) => s + (g.groupSize || 1), 0);
+      const totalVisited = guests.reduce((s, g) => s + (g.groupSize || 1), 0);
+
+      // Timeline progress
+      const now = Date.now();
+      const lastSlot = ev.slots && ev.slots.length ? ev.slots[ev.slots.length - 1].endTime : ev.startTime + 3600000;
+      const totalDur = lastSlot - ev.startTime;
+      const elapsed = Math.max(0, Math.min(now - ev.startTime, totalDur));
+      const pct = totalDur > 0 ? Math.round((elapsed / totalDur) * 100) : 0;
+
+      let html = '<h1>&#128308; שידור חי</h1>';
+
+      if (todayEvs.length > 1) {
+        html += '<div class="tabs mt-1">';
+        todayEvs.forEach(e => {
+          html += '<div class="tab ' + (e.id === selectedId ? 'active' : '') + '" onclick="window._liveSelect(\'' + e.id + '\')">' + esc(e.eventName) + '</div>';
         });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          if (res.status === 409) {
-            showScreen('screenFull');
-          } else {
-            showCodeError(data.error || 'שגיאה בכניסה');
-          }
-          return;
-        }
-
-        saveSession(data.id, data.name, 'preregistered');
-        if (navigator.vibrate) navigator.vibrate(100);
-        showActive();
-      } catch {
-        showCodeError('שגיאת תקשורת, נסו שוב');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'כניסה עם קוד';
-      }
-    }
-
-    async function doWalkinCheckin() {
-      const name = document.getElementById('nameInput').value.trim();
-      if (!name) {
-        showWalkinError('נא להזין שם');
-        return;
+        html += '</div>';
       }
 
-      const btn = document.getElementById('btnWalkin');
-      btn.disabled = true;
-      btn.textContent = 'נכנס...';
+      html += '<div class="card text-center">' +
+        '<h2>' + esc(ev.eventName) + '</h2>' +
+        '<div class="text-muted">' + esc(ev.clientName) + ' | ' + fmtDate(ev.date) + '</div>' +
+        '<div class="timeline-bar mt-2"><div class="timeline-fill" style="width:' + pct + '%"></div></div>' +
+        '<div class="text-muted" style="font-size:.75rem">' + pct + '% מהאירוע חלף</div>' +
+        '<div class="mt-2">' + counterRing(ac, ev.maxCapacity, 200) + '</div>' +
+        '<div class="mt-1" style="font-size:1.1rem">' + statusMsg(ac, ev.maxCapacity) + '</div></div>' +
 
-      try {
-        const res = await fetch('/api/checkin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name }),
+        '<div class="grid4 mt-1">' +
+        '<div class="stat-box"><div class="stat-num">' + totalVisited + '</div><div class="stat-label">ביקרו</div></div>' +
+        '<div class="stat-box"><div class="stat-num text-green">' + preRegs.length + '</div><div class="stat-label">נרשמו</div></div>' +
+        '<div class="stat-box"><div class="stat-num text-yellow">' + preRegs.filter(r => !r.arrived).length + '</div><div class="stat-label">ממתינים</div></div>' +
+        '<div class="stat-box"><div class="stat-num">' + ac + '</div><div class="stat-label">כרגע באירוע</div></div></div>';
+
+      // Recent activity
+      const recentGuests = guests.slice().sort((a, b) => b.checkinTime - a.checkinTime).slice(0, 5);
+      if (recentGuests.length) {
+        html += '<h3 class="mt-3 mb-1">&#9889; פעילות אחרונה</h3>';
+        recentGuests.forEach(g => {
+          const isActive = !g.checkoutTime;
+          html += '<div class="guest-row" style="' + (isActive ? '' : 'opacity:.5') + '"><div class="guest-info"><div class="guest-name">' + esc(g.name) +
+            ' <span class="badge ' + (isActive ? 'badge-green' : 'badge-muted') + '" style="font-size:.65rem">' + (isActive ? 'פעיל' : 'יצא') + '</span></div>' +
+            '<div class="guest-meta">&#128101; ' + (g.groupSize || 1) + ' | ' + fmtTime(g.checkinTime) + '</div></div></div>';
         });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          if (res.status === 409) {
-            if (data.reservedFull) {
-              showWalkinError(data.error);
-            } else {
-              showScreen('screenFull');
-            }
-          } else {
-            showWalkinError(data.error || 'שגיאה בכניסה');
-          }
-          return;
-        }
-
-        saveSession(data.id, data.name, 'walkin');
-        if (navigator.vibrate) navigator.vibrate(100);
-        showActive();
-      } catch {
-        showWalkinError('שגיאת תקשורת, נסו שוב');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'כניסה לאירוע';
       }
-    }
 
-    function saveSession(id, name, type) {
-      guestId = id;
-      guestName = name;
-      guestType = type;
-      checkinTime = Date.now();
-      localStorage.setItem('eventGateGuest', JSON.stringify({ id, name, type, checkinTime }));
+      setMain(html);
+    } catch (e) {
+      setMain('<div class="card text-red text-center">' + esc(e.message) + '</div>');
     }
+  }
 
-    async function doCheckout() {
-      if (!guestId) return;
-      try {
-        const res = await fetch(`/api/checkout/${guestId}`, { method: 'POST' });
-        const data = await res.json();
-        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-        const duration = data.duration || (Date.now() - checkinTime);
-        document.getElementById('doneDuration').textContent = `שהיתם באירוע ${formatDuration(duration)}`;
-        clearSession();
-        showScreen('screenDone');
-      } catch {
-        clearSession();
-        showScreen('screenDone');
-      }
+  window._liveSelect = function(id) { selectedId = id; };
+  await load();
+  refreshTimer = setInterval(load, 2000);
+}
+
+// ===================== MEMBERS =====================
+async function renderMembers() {
+  setMain('<div class="text-center text-muted mt-3">&#8987; טוען...</div>');
+  try {
+    const data = await api('/api/members');
+    const members = data.members || [];
+    let html = '<h1>&#128101; חברי מועדון (' + members.length + ')</h1>';
+    if (!members.length) {
+      html += '<div class="card mt-2 text-center text-muted">אין חברים עדיין</div>';
+    } else {
+      html += '<div class="mt-2">';
+      members.forEach(m => {
+        html += '<div class="guest-row"><div class="guest-info"><div class="guest-name">' + esc(m.name) + '</div>' +
+          '<div class="guest-meta">' + esc(m.phone) +
+          (m.city ? ' | ' + esc(m.city) : '') +
+          (m.childAges ? ' | גילאי ילדים: ' + esc(m.childAges) : '') + '</div></div></div>';
+      });
+      html += '</div>';
     }
+    setMain(html);
+  } catch (e) {
+    setMain('<div class="card text-red">' + esc(e.message) + '</div>');
+  }
+}
 
-    function clearSession() {
-      guestId = null;
-      guestName = '';
-      guestType = '';
-      checkinTime = null;
-      localStorage.removeItem('eventGateGuest');
-      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    }
+// ===================== PUBLIC REGISTRATION =====================
+async function showPublicRegistration(eventId) {
+  const container = document.getElementById('public-register');
+  container.classList.remove('hidden');
+  container.innerHTML = '<div class="text-center text-muted mt-3" style="padding:60px 0">&#8987; טוען פרטי אירוע...</div>';
 
-    function startTimer() {
-      if (timerInterval) clearInterval(timerInterval);
-      updateTimer();
-      timerInterval = setInterval(updateTimer, 1000);
-    }
+  try {
+    const ev = await api('/api/events/' + eventId, { noAuth: true });
+    const slotCounts = ev.slotCounts || {};
 
-    function updateTimer() {
-      if (!checkinTime) return;
-      const elapsed = Date.now() - checkinTime;
-      document.getElementById('activeTimer').textContent = formatTime(elapsed);
-    }
-
-    function formatTime(ms) {
-      const s = Math.floor(ms / 1000) % 60;
-      const m = Math.floor(ms / 60000) % 60;
-      const h = Math.floor(ms / 3600000);
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    }
-
-    function formatDuration(ms) {
-      const m = Math.floor(ms / 60000);
-      if (m < 60) return `${m} דקות`;
-      const h = Math.floor(m / 60);
-      return `${h} שעות ו-${m % 60} דקות`;
-    }
-
-    function showCodeError(msg) {
-      const el = document.getElementById('codeError');
-      el.textContent = msg;
-      el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 4000);
-    }
-
-    function showWalkinError(msg) {
-      const el = document.getElementById('walkinError');
-      el.textContent = msg;
-      el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 4000);
-    }
-
-    // Enter keys
-    document.getElementById('codeInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); doCodeCheckin(); }
+    let slotsHtml = '';
+    (ev.slots || []).forEach(function(s) {
+      const count = slotCounts[s.index] || 0;
+      const avail = ev.maxCapacity - count;
+      const full = avail <= 0;
+      slotsHtml += '<div class="slot-card slot-selectable' + (full ? ' disabled' : '') + '" data-slot="' + s.index + '" onclick="' + (full ? '' : 'selectSlot(' + s.index + ')') + '">' +
+        '<div class="slot-time">' + s.label + '</div>' +
+        '<div style="font-size:.8rem;margin-top:4px;color:' + (full ? 'var(--red)' : 'var(--green)') + '">' +
+        (full ? 'מלא' : avail + ' מקומות פנויים') + '</div></div>';
     });
-    document.getElementById('nameInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); doWalkinCheckin(); }
+
+    container.innerHTML =
+      '<div class="reg-hero">' +
+        '<div style="font-size:2.5rem;margin-bottom:8px">&#127880;</div>' +
+        '<h1>' + esc(ev.eventName || 'אירוע') + '</h1>' +
+        '<div class="text-muted" style="font-size:1.1rem">' + esc(ev.clientName || '') + '</div>' +
+        '<div class="mt-1" style="font-size:1.05rem">&#128197; ' + fmtDate(ev.date) + ' &nbsp; &#128336; ' + fmtTime(ev.startTime) + '</div>' +
+        (ev.eventAddress ? '<div class="mt-1"><a href="' + wazeLink(ev.eventAddress) + '" target="_blank" style="color:var(--accent2)">&#128205; ' + esc(ev.eventAddress) + ' (פתח ב-Waze)</a></div>' : '') +
+        (ev.attractions ? '<div class="mt-1" style="font-size:.9rem;color:var(--muted)">&#127914; ' + esc(ev.attractions) + '</div>' : '') +
+      '</div>' +
+
+      '<div class="card" id="reg-form-card">' +
+        '<h2>&#128203; הרשמה לאירוע</h2>' +
+        '<div class="form-group mt-1"><label>שם מלא</label><input id="r-name" placeholder="שם מלא"></div>' +
+        '<div class="form-group"><label>טלפון</label><input id="r-phone" type="tel" placeholder="050-1234567" dir="ltr"></div>' +
+        '<div class="form-group"><label>מספר משתתפים (גודל משפחה)</label><input id="r-participants" type="number" min="1" value="1"></div>' +
+        '<h3 class="mt-2 mb-1">&#128339; בחרו חלון זמן</h3>' +
+        '<div class="grid2" id="slot-selection">' + slotsHtml + '</div>' +
+        '<input type="hidden" id="r-slot" value="">' +
+        '<button class="btn btn-block btn-green mt-2" style="padding:14px;font-size:1.1rem" onclick="submitRegistration(\'' + eventId + '\')">&#10003; הרשמה</button>' +
+      '</div>' +
+
+      '<div id="reg-success"></div>' +
+
+      '<div class="footer">' +
+        '<div>&#127880; טופי - הפקות אירועים</div>' +
+        '<div>בן כהן 0523866819 | אורי ישי עמרן 052-2123345</div>' +
+        '<div style="margin-top:4px">&copy; ' + new Date().getFullYear() + ' חברים של טופי בע״מ</div>' +
+      '</div>';
+  } catch (e) {
+    container.innerHTML = '<div class="card text-center text-red mt-3" style="margin-top:60px">' + esc(e.message) + '</div>';
+  }
+}
+
+window.selectSlot = function(idx) {
+  document.getElementById('r-slot').value = idx;
+  document.querySelectorAll('#slot-selection .slot-selectable').forEach(function(el) {
+    el.classList.toggle('selected', parseInt(el.dataset.slot) === idx);
+  });
+};
+
+async function submitRegistration(eventId) {
+  const name = document.getElementById('r-name').value.trim();
+  const phone = document.getElementById('r-phone').value.trim();
+  const participants = parseInt(document.getElementById('r-participants').value) || 1;
+  const slotIndex = document.getElementById('r-slot').value;
+
+  if (!name) { toast('נא להזין שם', 'error'); return; }
+  if (slotIndex === '') { toast('נא לבחור חלון זמן', 'error'); return; }
+
+  try {
+    const ev = await api('/api/events/' + eventId, { noAuth: true });
+    const res = await api('/api/events/' + eventId + '/register', {
+      method: 'POST',
+      body: { name: name, phone: phone, slotIndex: parseInt(slotIndex), participants: participants },
+      noAuth: true
     });
-    // Auto uppercase code input
-    document.getElementById('codeInput').addEventListener('input', (e) => {
-      e.target.value = e.target.value.toUpperCase();
-    });
-  </script>
+
+    document.getElementById('reg-form-card').classList.add('hidden');
+    const slot = res.slot;
+    const totalMin = (ev.slotDurationMin || 30) * (ev.numSlots || 1);
+    const calUrl = calLink(ev.eventName || 'אירוע', ev.startTime, totalMin, ev.eventAddress);
+    const shareText = 'הצטרפו אלי לאירוע ' + (ev.eventName || '') + '! הרשמו כאן: ' + location.origin + location.pathname + '?event=' + eventId;
+
+    document.getElementById('reg-success').innerHTML =
+      '<div class="card text-center">' +
+        '<div style="font-size:3.5rem">&#127881;</div>' +
+        '<h2>נרשמת בהצלחה!</h2>' +
+        '<div class="mt-2" style="background:var(--bg);padding:20px;border-radius:12px">' +
+          '<div class="text-muted">קוד הכניסה שלך</div>' +
+          '<div style="font-size:2.5rem;font-weight:700;letter-spacing:6px;color:var(--accent2);direction:ltr">' + res.code + '</div>' +
+        '</div>' +
+        '<div class="text-muted mt-1">&#128339; ' + slot.label + '</div>' +
+        '<div class="mt-2 grid2">' +
+          '<a href="' + calUrl + '" target="_blank" class="btn btn-block btn-sm" style="text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center">&#128197; הוסף ליומן</a>' +
+          '<a href="' + waLink('', shareText) + '" target="_blank" class="btn-green btn-block btn-sm" style="text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center">&#128172; שתף חברים</a>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>&#128188; הצטרף למועדון חברים של טופי!</h3>' +
+        '<p class="text-muted" style="font-size:.85rem">קבלו עדכונים על אירועים חדשים והטבות</p>' +
+        '<div class="form-group mt-1"><label>שם</label><input id="m-name" value="' + esc(name) + '"></div>' +
+        '<div class="form-group"><label>טלפון</label><input id="m-phone" value="' + esc(phone) + '" dir="ltr"></div>' +
+        '<div class="form-group"><label>עיר</label><input id="m-city" placeholder="עיר מגורים"></div>' +
+        '<div class="form-group"><label>גילאי ילדים</label><input id="m-ages" placeholder="לדוגמה: 3, 5, 8"></div>' +
+        '<button class="btn btn-block" onclick="joinClub()">&#10024; הצטרף למועדון</button>' +
+        '<div id="club-result"></div>' +
+      '</div>';
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function joinClub() {
+  const name = document.getElementById('m-name').value.trim();
+  const phone = document.getElementById('m-phone').value.trim();
+  const city = document.getElementById('m-city').value.trim();
+  const childAges = document.getElementById('m-ages').value.trim();
+  if (!name || !phone) { toast('שם וטלפון נדרשים', 'error'); return; }
+  try {
+    await api('/api/members', { method: 'POST', body: { name: name, phone: phone, city: city, childAges: childAges }, noAuth: true });
+    document.getElementById('club-result').innerHTML = '<div class="text-green mt-1" style="font-size:1.1rem">&#10003; נרשמת בהצלחה למועדון!</div>';
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// ===================== CLIENT VIEW =====================
+async function showClientView(token) {
+  const container = document.getElementById('client-view');
+  container.classList.remove('hidden');
+  container.innerHTML = '<div class="text-center text-muted" style="padding:60px 0">&#8987; טוען...</div>';
+
+  async function load() {
+    try {
+      const ev = await api('/api/client/' + token, { noAuth: true });
+      const ac = ev.activeCount || 0;
+
+      container.innerHTML =
+        '<div class="text-center">' +
+          '<div style="font-size:1.5rem;margin-bottom:4px">&#127880; טופי</div>' +
+          '<h1>' + esc(ev.eventName || 'אירוע') + '</h1>' +
+          '<div class="text-muted">' + esc(ev.clientName || '') + ' | ' + fmtDate(ev.date) + '</div>' +
+          '<div class="mt-2">' + counterRing(ac, ev.maxCapacity, 200) + '</div>' +
+          '<div class="mt-1" style="font-size:1.1rem">' + statusMsg(ac, ev.maxCapacity) + '</div>' +
+        '</div>' +
+
+        '<div class="grid3 mt-2">' +
+          '<div class="stat-box"><div class="stat-num">' + (ev.totalGuests || 0) + '</div><div class="stat-label">ביקרו סה"כ</div></div>' +
+          '<div class="stat-box"><div class="stat-num text-green">' + (ev.totalRegs || 0) + '</div><div class="stat-label">נרשמו</div></div>' +
+          '<div class="stat-box"><div class="stat-num text-yellow">' + (ev.pendingRegs || 0) + '</div><div class="stat-label">ממתינים</div></div>' +
+        '</div>' +
+
+        '<h3 class="mt-3 mb-1">&#128339; חלונות זמן</h3>' +
+        '<div class="grid3">' +
+          (ev.slots || []).map(function(s) { return '<div class="slot-card"><div class="slot-time">' + s.label + '</div></div>'; }).join('') +
+        '</div>' +
+
+        '<div class="footer">' +
+          '<div>&#127880; טופי - הפקות אירועים</div>' +
+          '<div>בן כהן 0523866819 | אורי ישי עמרן 052-2123345</div>' +
+          '<div style="margin-top:4px">&copy; ' + new Date().getFullYear() + ' חברים של טופי בע״מ</div>' +
+          '<div class="mt-1 text-muted" style="font-size:.7rem">&#128260; מתעדכן אוטומטית כל 3 שניות</div>' +
+        '</div>';
+    } catch (e) {
+      container.innerHTML = '<div class="card text-center text-red" style="margin-top:60px">' + esc(e.message) + '</div>';
+    }
+  }
+
+  await load();
+  refreshTimer = setInterval(load, 3000);
+}
+</script>
 </body>
 </html>
