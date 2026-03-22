@@ -648,6 +648,10 @@
         </div>
         <div class="hint">כמה אנשים יגיעו (כולל ילדים ומבוגרים)</div>
       </div>
+      <div id="regWaitlistBanner" style="display:none;background:linear-gradient(135deg,rgba(249,115,22,.08),rgba(239,68,68,.08));border:1px solid rgba(249,115,22,.3);border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">
+        <div style="font-size:1rem;font-weight:700;color:var(--orange);margin-bottom:4px">⏳ כל הסבבים מלאים</div>
+        <div style="font-size:.8rem;color:var(--muted)">ניתן להירשם לרשימת ההמתנה — אם יתפנה מקום תקבלו אישור השתתפות</div>
+      </div>
       <div class="form-group">
         <label>בחרו חלון זמן</label>
         <div id="regSlotGrid"></div>
@@ -2060,23 +2064,50 @@ function renderRegister() {
   document.getElementById('regFormSection').style.display = 'block';
 
   const regs = Object.values(S.preRegs);
+  const waitlist = Object.values(S.waitlist || {}).filter(w => w.status === 'waiting');
+  const allSlotsFull = S.slots.every(slot => {
+    const count = regs.filter(r => r.slotIndex === slot.index).reduce((s, r) => s + (r.participants || 1), 0);
+    return count >= S.maxCapacity;
+  });
+
+  // Show waitlist banner if all slots full
+  const wlBanner = document.getElementById('regWaitlistBanner');
+  if (wlBanner) wlBanner.style.display = allSlotsFull ? 'block' : 'none';
+
   const grid = document.getElementById('regSlotGrid');
   grid.innerHTML = S.slots.map(slot => {
-    const count = regs.filter(r => r.slotIndex === slot.index).length;
+    const count = regs.filter(r => r.slotIndex === slot.index).reduce((s, r) => s + (r.participants || 1), 0);
     const avail = S.maxCapacity - count;
     const full = avail <= 0;
     const pct = count / S.maxCapacity;
+    const slotWaitCount = waitlist.filter(w => w.slotIndex === slot.index).reduce((s, w) => s + (w.participants || 1), 0);
     let cls = 'avail-ok', txt = `${avail} מקומות`;
-    if (full) { cls = 'avail-full'; txt = 'מלא'; }
-    else if (pct >= .8) { cls = 'avail-low'; txt = `${avail} אחרונים`; }
+    if (full) {
+      cls = 'avail-full';
+      txt = slotWaitCount > 0 ? `מלא | ${slotWaitCount} ממתינים` : 'מלא — רשימת המתנה';
+    }
+    else if (pct >= .8) { cls = 'avail-low'; txt = `${avail} אחרונים!`; }
 
-    return `<div class="slot-option ${full ? 'full' : ''} ${selectedRegSlot === slot.index ? 'selected' : ''}" onclick="${full ? '' : `selectRegSlot(${slot.index})`}">
-      <div><div class="slot-time">${slot.label}</div><div class="slot-info">סבב ${slot.index + 1}</div></div>
+    const fullStyle = full ? 'background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.3)' : '';
+    return `<div class="slot-option ${full ? 'full-waitlist' : ''} ${selectedRegSlot === slot.index ? 'selected' : ''}" style="${fullStyle}" onclick="selectRegSlot(${slot.index})">
+      <div><div class="slot-time">${slot.label}</div><div class="slot-info">סבב ${slot.index + 1}${full ? ' <span style="color:var(--orange);font-size:.65rem">⏳ המתנה</span>' : ''}</div></div>
       <span class="slot-avail ${cls}">${txt}</span></div>`;
   }).join('');
 }
 
-function selectRegSlot(i) { selectedRegSlot = i; renderRegister(); }
+function selectRegSlot(i) {
+  selectedRegSlot = i;
+  renderRegister();
+  // Update button text based on slot availability
+  const regs = Object.values(S.preRegs);
+  const count = regs.filter(r => r.slotIndex === i).reduce((s, r) => s + (r.participants || 1), 0);
+  const full = count >= S.maxCapacity;
+  const btn = document.querySelector('#regFormSection .btn-primary.blue');
+  if (btn) {
+    btn.textContent = full ? '⏳ הרשמה לרשימת המתנה' : 'הרשמה';
+    btn.style.background = full ? 'linear-gradient(135deg,#f97316,#ea580c)' : '';
+  }
+}
 
 function showRegForm() {
   selectedRegSlot = -1;
@@ -3177,9 +3208,23 @@ function exportCSV() {
     csv += `"${csvSafe(r.name)}","${csvSafe(r.phone || '')}",מראש,${slot},${r.participants || 1},,,,לא הגיע\n`;
   });
 
+  // Waitlist section
+  const waitlist = Object.values(S.waitlist || {}).filter(w => w.status === 'waiting');
+  if (waitlist.length > 0) {
+    csv += '\n\nרשימת המתנה\nשם,טלפון,סבב,משתתפים,תאריך רישום,סטטוס\n';
+    waitlist.sort((a, b) => a.registeredAt - b.registeredAt).forEach(w => {
+      const slot = `סבב ${w.slotIndex + 1}`;
+      const regDate = w.registeredAt ? new Date(w.registeredAt).toLocaleString('he-IL', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+      csv += `"${csvSafe(w.name)}","${csvSafe(w.phone || '')}",${slot},${w.participants || 1},"${regDate}",ממתין/ה\n`;
+    });
+    const waitlistTotal = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
+    csv += `סה"כ ממתינים (משתתפים),${waitlistTotal}\n`;
+  }
+
   const totalParticipants = Object.values(S.guests).reduce((s, g) => s + (g.groupSize || 1), 0);
   const totalRegsParticipants = Object.values(S.preRegs).reduce((s, r) => s + (r.participants || 1), 0);
-  csv += `\nסיכום\nסה"כ ביקרו (משתתפים),${totalParticipants}\nנוכחים כרגע,${activeCount()}\nנרשמו מראש (משתתפים),${totalRegsParticipants}\n`;
+  const totalWaitlist = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
+  csv += `\nסיכום\nסה"כ ביקרו (משתתפים),${totalParticipants}\nנוכחים כרגע,${activeCount()}\nנרשמו מראש (משתתפים),${totalRegsParticipants}\nממתינים (משתתפים),${totalWaitlist}\n`;
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
