@@ -475,10 +475,14 @@
   <div class="card">
     <div class="card-title">&#9881;&#65039; הגדרת אירוע</div>
     <div class="form-group" id="clientSelectorWrap" style="display:none">
-      <label>בחר לקוח קיים</label>
-      <select id="cfgClientSelect" onchange="onClientSelect(this.value)" style="width:100%;padding:12px 14px;background:var(--bg);border:2px solid var(--input-border);border-radius:12px;color:var(--text);font-size:1rem;-webkit-appearance:none">
-        <option value="">+ לקוח חדש</option>
-      </select>
+      <label style="display:flex;align-items:center;gap:6px">&#128101; בחר לקוח קיים</label>
+      <div style="position:relative">
+        <select id="cfgClientSelect" onchange="onClientSelect(this.value)" style="width:100%;padding:14px 40px 14px 14px;background:linear-gradient(135deg,rgba(59,130,246,.06),rgba(168,85,247,.06));border:2px solid var(--blue);border-radius:14px;color:var(--text);font-size:1rem;-webkit-appearance:none;appearance:none;cursor:pointer;font-weight:600">
+          <option value="">➕ לקוח חדש</option>
+        </select>
+        <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--blue);font-size:1.1rem">▾</span>
+      </div>
+      <div class="hint">בחירת לקוח קיים תמלא אוטומטית את פרטי איש הקשר</div>
     </div>
     <div class="form-group">
       <label>שם לקוח / עסק</label>
