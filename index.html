@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>שער אירוע - ניהול זרימת קהל</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #22c55e;
+      --yellow: #eab308;
+      --orange: #f97316;
+      --red: #ef4444;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    .header {
+      background: var(--card);
+      padding: 16px 20px;
+      text-align: center;
+      border-bottom: 1px solid #334155;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .header .event-time {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* Main Counter */
+    .counter-section {
+      padding: 30px 20px 20px;
+      text-align: center;
+    }
+
+    .counter-ring {
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 20px;
+      position: relative;
+    }
+
+    .counter-ring svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .counter-ring .bg-circle {
+      fill: none;
+      stroke: #334155;
+      stroke-width: 12;
+    }
+
+    .counter-ring .progress-circle {
+      fill: none;
+      stroke-width: 12;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+    }
+
+    .counter-inner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .counter-number {
+      font-size: 4rem;
+      font-weight: 800;
+      line-height: 1;
+      transition: color 0.3s ease;
+    }
+
+    .counter-label {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .counter-max {
+      font-size: 1.1rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      text-align: center;
+      padding: 12px 20px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 12px;
+      margin: 0 20px 20px;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .status-ok { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+    .status-warn { background: rgba(234, 179, 8, 0.15); color: var(--yellow); }
+    .status-danger { background: rgba(249, 115, 22, 0.15); color: var(--orange); }
+    .status-full { background: rgba(239, 68, 68, 0.2); color: var(--red); animation: pulse 1.5s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* Action Buttons */
+    .actions {
+      display: flex;
+      gap: 16px;
+      padding: 0 20px 20px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 18px 16px;
+      border: none;
+      border-radius: 16px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.1s ease, opacity 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn:active { transform: scale(0.95); }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+    .btn-enter {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+    }
+
+    .btn-exit {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: white;
+    }
+
+    .btn-icon { font-size: 2rem; }
+
+    /* Quick Name Input */
+    .name-section {
+      padding: 0 20px 20px;
+    }
+
+    .name-toggle {
+      background: var(--card);
+      border: 1px solid #334155;
+      color: var(--muted);
+      padding: 10px 16px;
+      border-radius: 12px;
+      width: 100%;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .name-input-wrap {
+      display: none;
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid #334155;
+    }
+
+    .name-input-wrap.show { display: block; }
+
+    .name-input-wrap input {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg);
+      border: 1px solid #475569;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 1rem;
+      text-align: right;
+      outline: none;
+    }
+
+    .name-input-wrap input:focus { border-color: #60a5fa; }
+
+    .name-input-wrap .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    /* Stats Row */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      padding: 0 20px 20px;
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--card);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Log Section */
+    .log-section {
+      padding: 0 20px 100px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .log-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .log-clear {
+      background: none;
+      border: 1px solid #475569;
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .log-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      border-right: 4px solid;
+    }
+
+    .log-entry.entry-in { border-color: var(--green); }
+    .log-entry.entry-out { border-color: var(--orange); }
+
+    .log-entry .log-name { font-weight: 600; }
+    .log-entry .log-time { color: var(--muted); font-size: 0.8rem; }
+    .log-entry .log-type { font-size: 0.75rem; font-weight: 600; }
+    .log-entry .log-type.type-in { color: var(--green); }
+    .log-entry .log-type.type-out { color: var(--orange); }
+
+    /* Settings panel */
+    .settings-toggle {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: var(--card);
+      border: 1px solid #475569;
+      color: var(--muted);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      font-size: 1.4rem;
+      cursor: pointer;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .settings-panel {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      left: 20px;
+      right: 20px;
+      background: var(--card);
+      border: 1px solid #475569;
+      border-radius: 16px;
+      padding: 20px;
+      z-index: 20;
+    }
+
+    .settings-panel.show { display: block; }
+
+    .settings-panel h3 {
+      margin-bottom: 16px;
+      font-size: 1rem;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .setting-row label {
+      font-size: 0.9rem;
+    }
+
+    .setting-row input[type="number"] {
+      width: 80px;
+      padding: 8px 12px;
+      background: var(--bg);
+      border: 1px solid #475569;
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .reset-btn {
+      width: 100%;
+      padding: 12px;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    .export-btn {
+      width: 100%;
+      padding: 12px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    /* Overlay for full capacity */
+    .full-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(239, 68, 68, 0.1);
+      backdrop-filter: blur(2px);
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .full-overlay.show {
+      display: block;
+      animation: overlayPulse 2s infinite;
+    }
+
+    @keyframes overlayPulse {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="full-overlay" id="fullOverlay"></div>
+
+  <div class="header">
+    <h1>שער אירוע - ניהול קהל</h1>
+    <div class="event-time" id="eventTime"></div>
+  </div>
+
+  <div class="counter-section">
+    <div class="counter-ring">
+      <svg viewBox="0 0 200 200">
+        <circle class="bg-circle" cx="100" cy="100" r="88" />
+        <circle class="progress-circle" id="progressCircle" cx="100" cy="100" r="88" />
+      </svg>
+      <div class="counter-inner">
+        <div class="counter-number" id="currentCount">0</div>
+        <div class="counter-label">נוכחים כרגע</div>
+        <div class="counter-max">מתוך <span id="maxDisplay">50</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar status-ok" id="statusBar">
+    ניתן להכניס אורחים
+  </div>
+
+  <div class="name-section">
+    <button class="name-toggle" id="nameToggle" onclick="toggleNameInput()">
+      לחצו כאן לרישום שם (אופציונלי)
+    </button>
+    <div class="name-input-wrap" id="nameWrap">
+      <input type="text" id="nameInput" placeholder="שם האורח (אופציונלי)" autocomplete="off" />
+      <div class="hint">השם יופיע ביומן הכניסות והיציאות</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-enter" id="btnEnter" onclick="handleEntry()">
+      <span class="btn-icon">+</span>
+      כניסה
+    </button>
+    <button class="btn btn-exit" id="btnExit" onclick="handleExit()" disabled>
+      <span class="btn-icon">-</span>
+      יציאה
+    </button>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-value" id="totalIn" style="color: var(--green)">0</div>
+      <div class="stat-label">סה"כ נכנסו</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="totalOut" style="color: var(--orange)">0</div>
+      <div class="stat-label">סה"כ יצאו</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="peakCount" style="color: #60a5fa">0</div>
+      <div class="stat-label">שיא נוכחות</div>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="log-header">
+      <h2>יומן תנועות</h2>
+      <button class="log-clear" onclick="clearLog()">נקה יומן</button>
+    </div>
+    <div class="log-list" id="logList">
+      <div style="text-align: center; color: var(--muted); padding: 20px; font-size: 0.9rem;">
+        עדיין אין תנועות
+      </div>
+    </div>
+  </div>
+
+  <button class="settings-toggle" onclick="toggleSettings()">⚙</button>
+
+  <div class="settings-panel" id="settingsPanel">
+    <h3>הגדרות</h3>
+    <div class="setting-row">
+      <label>מספר משתתפים מקסימלי</label>
+      <input type="number" id="maxInput" value="50" min="1" max="999" onchange="updateMax()" />
+    </div>
+    <button class="export-btn" onclick="exportLog()">ייצוא יומן (CSV)</button>
+    <button class="reset-btn" onclick="resetAll()">איפוס מלא</button>
+  </div>
+
+  <script>
+    // State
+    let state = loadState() || {
+      current: 0,
+      totalIn: 0,
+      totalOut: 0,
+      peak: 0,
+      max: 50,
+      log: [],
+      startTime: Date.now()
+    };
+
+    const circumference = 2 * Math.PI * 88;
+
+    // Initialize
+    render();
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem('eventGateState');
+        return saved ? JSON.parse(saved) : null;
+      } catch { return null; }
+    }
+
+    function saveState() {
+      localStorage.setItem('eventGateState', JSON.stringify(state));
+    }
+
+    function handleEntry() {
+      if (state.current >= state.max) return;
+
+      const name = document.getElementById('nameInput').value.trim() || `אורח #${state.totalIn + 1}`;
+
+      state.current++;
+      state.totalIn++;
+      if (state.current > state.peak) state.peak = state.current;
+
+      state.log.unshift({
+        type: 'in',
+        name: name,
+        time: Date.now(),
+        count: state.current
+      });
+
+      document.getElementById('nameInput').value = '';
+
+      // Vibrate on mobile
+      if (navigator.vibrate) navigator.vibrate(50);
+
+      saveState();
+      render();
+    }
+
+    function handleExit() {
+      if (state.current <= 0) return;
+
+      const name = document.getElementById('nameInput').value.trim() || findLastEntrant();
+
+      state.current--;
+      state.totalOut++;
+
+      state.log.unshift({
+        type: 'out',
+        name: name,
+        time: Date.now(),
+        count: state.current
+      });
+
+      document.getElementById('nameInput').value = '';
+
+      if (navigator.vibrate) navigator.vibrate([30, 30, 30]);
+
+      saveState();
+      render();
+    }
+
+    function findLastEntrant() {
+      // Find the most recent entry that hasn't been matched with an exit
+      const ins = state.log.filter(e => e.type === 'in').map(e => e.name);
+      const outs = state.log.filter(e => e.type === 'out').map(e => e.name);
+
+      for (const name of ins) {
+        const inCount = ins.filter(n => n === name).length;
+        const outCount = outs.filter(n => n === name).length;
+        if (inCount > outCount) return name;
+      }
+      return `אורח יוצא`;
+    }
+
+    function render() {
+      const pct = state.current / state.max;
+      const offset = circumference - (pct * circumference);
+
+      // Progress circle
+      const circle = document.getElementById('progressCircle');
+      circle.style.strokeDasharray = circumference;
+      circle.style.strokeDashoffset = offset;
+
+      // Color based on capacity
+      let color;
+      if (pct >= 1) color = 'var(--red)';
+      else if (pct >= 0.9) color = 'var(--orange)';
+      else if (pct >= 0.7) color = 'var(--yellow)';
+      else color = 'var(--green)';
+
+      circle.style.stroke = color;
+
+      // Counter
+      const counterEl = document.getElementById('currentCount');
+      counterEl.textContent = state.current;
+      counterEl.style.color = color;
+
+      document.getElementById('maxDisplay').textContent = state.max;
+
+      // Stats
+      document.getElementById('totalIn').textContent = state.totalIn;
+      document.getElementById('totalOut').textContent = state.totalOut;
+      document.getElementById('peakCount').textContent = state.peak;
+
+      // Buttons
+      document.getElementById('btnEnter').disabled = state.current >= state.max;
+      document.getElementById('btnExit').disabled = state.current <= 0;
+
+      // Status bar
+      const statusBar = document.getElementById('statusBar');
+      const remaining = state.max - state.current;
+
+      statusBar.className = 'status-bar';
+      if (state.current >= state.max) {
+        statusBar.classList.add('status-full');
+        statusBar.textContent = 'האירוע מלא! יש להמתין ליציאת אורחים';
+      } else if (pct >= 0.9) {
+        statusBar.classList.add('status-danger');
+        statusBar.textContent = `נותרו ${remaining} מקומות בלבד!`;
+      } else if (pct >= 0.7) {
+        statusBar.classList.add('status-warn');
+        statusBar.textContent = `נותרו ${remaining} מקומות`;
+      } else {
+        statusBar.classList.add('status-ok');
+        statusBar.textContent = `ניתן להכניס אורחים — ${remaining} מקומות פנויים`;
+      }
+
+      // Full overlay
+      document.getElementById('fullOverlay').classList.toggle('show', state.current >= state.max);
+
+      // Log
+      renderLog();
+    }
+
+    function renderLog() {
+      const list = document.getElementById('logList');
+
+      if (state.log.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 20px; font-size: 0.9rem;">עדיין אין תנועות</div>';
+        return;
+      }
+
+      list.innerHTML = state.log.slice(0, 50).map(entry => {
+        const time = new Date(entry.time);
+        const timeStr = time.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const isIn = entry.type === 'in';
+
+        return `
+          <div class="log-entry ${isIn ? 'entry-in' : 'entry-out'}">
+            <div>
+              <span class="log-name">${escapeHtml(entry.name)}</span>
+              <span class="log-type ${isIn ? 'type-in' : 'type-out'}"> — ${isIn ? 'כניסה' : 'יציאה'}</span>
+            </div>
+            <div>
+              <span class="log-time">${timeStr}</span>
+              <span style="color: var(--muted); font-size: 0.75rem;"> (${entry.count})</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function toggleNameInput() {
+      const wrap = document.getElementById('nameWrap');
+      const toggle = document.getElementById('nameToggle');
+      wrap.classList.toggle('show');
+      toggle.style.display = wrap.classList.contains('show') ? 'none' : 'block';
+      if (wrap.classList.contains('show')) {
+        document.getElementById('nameInput').focus();
+      }
+    }
+
+    function toggleSettings() {
+      document.getElementById('settingsPanel').classList.toggle('show');
+    }
+
+    function updateMax() {
+      const val = parseInt(document.getElementById('maxInput').value);
+      if (val > 0) {
+        state.max = val;
+        saveState();
+        render();
+      }
+    }
+
+    function clearLog() {
+      if (confirm('האם לנקות את יומן התנועות?')) {
+        state.log = [];
+        saveState();
+        render();
+      }
+    }
+
+    function resetAll() {
+      if (confirm('האם לאפס הכל? כל הנתונים יימחקו.')) {
+        state = {
+          current: 0,
+          totalIn: 0,
+          totalOut: 0,
+          peak: 0,
+          max: state.max,
+          log: [],
+          startTime: Date.now()
+        };
+        saveState();
+        render();
+      }
+    }
+
+    function updateClock() {
+      const elapsed = Date.now() - state.startTime;
+      const hours = Math.floor(elapsed / 3600000);
+      const mins = Math.floor((elapsed % 3600000) / 60000);
+      document.getElementById('eventTime').textContent =
+        `זמן מתחילת האירוע: ${hours} שעות ${mins} דקות`;
+    }
+
+    function exportLog() {
+      if (state.log.length === 0) {
+        alert('אין נתונים לייצוא');
+        return;
+      }
+
+      const bom = '\uFEFF';
+      let csv = bom + 'שעה,שם,סוג,נוכחים\n';
+
+      // Reverse to chronological order
+      [...state.log].reverse().forEach(entry => {
+        const time = new Date(entry.time).toLocaleTimeString('he-IL', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        const type = entry.type === 'in' ? 'כניסה' : 'יציאה';
+        csv += `${time},"${entry.name}",${type},${entry.count}\n`;
+      });
+
+      csv += `\nסיכום\n`;
+      csv += `סה"כ נכנסו,${state.totalIn}\n`;
+      csv += `סה"כ יצאו,${state.totalOut}\n`;
+      csv += `שיא נוכחות,${state.peak}\n`;
+      csv += `מקסימום מותר,${state.max}\n`;
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `יומן_אירוע_${new Date().toLocaleDateString('he-IL').replace(/\./g, '-')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Handle Enter key for quick entry
+    document.getElementById('nameInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleEntry();
+      }
+    });
+  </script>
+</body>
+</html>
