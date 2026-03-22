@@ -635,8 +635,8 @@
         <input type="text" id="regName" placeholder="הכניסו שם" autocomplete="name" />
       </div>
       <div class="form-group">
-        <label>טלפון <span style="font-weight:400;color:var(--muted);font-size:.8rem">(אופציונלי)</span></label>
-        <input type="tel" id="regPhone" placeholder="050-1234567" autocomplete="tel" />
+        <label>טלפון <span style="font-weight:400;color:var(--red);font-size:.8rem">*חובה</span></label>
+        <input type="tel" id="regPhone" placeholder="050-1234567" autocomplete="tel" required />
       </div>
       <div class="form-group">
         <label>כמות משתתפים</label>
@@ -1980,6 +1980,7 @@ function doRegister() {
   const name = document.getElementById('regName').value.trim();
   const phone = document.getElementById('regPhone').value.trim();
   if (!name) { showError('נא להזין שם'); return; }
+  if (!phone || phone.replace(/[^0-9]/g, '').length < 9) { showError('נא להזין מספר טלפון תקין'); return; }
   if (selectedRegSlot < 0) { showError('נא לבחור חלון זמן'); return; }
 
   const participants = Math.max(1, Math.min(20, parseInt(document.getElementById('regParticipants').value) || 1));
