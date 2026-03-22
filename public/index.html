@@ -3642,9 +3642,11 @@ async function doAdminLogin() {
   }
 }
 document.getElementById('adminTokenInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') doAdminLogin(); });
-// Show login if no token and no public view params
+// Show login ONLY for admin — never for client/guest/register views
 const _urlP = new URLSearchParams(window.location.search);
-if (!_urlP.get('client') && !_urlP.get('event')) {
+const _hash = window.location.hash.replace('#', '');
+const _isPublicView = _urlP.get('client') || _urlP.get('event') || _hash === 'register' || _hash === 'checkin';
+if (!_isPublicView) {
   setTimeout(checkAdminLogin, 200);
 }
 </script>
