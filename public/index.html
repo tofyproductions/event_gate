@@ -1490,13 +1490,22 @@ function renderHomeList(el, reg) {
                          status === 'future' ? '<span class="badge badge-blue" style="font-size:.65rem;margin-right:6px">\ud83d\udcc5 \u05e2\u05ea\u05d9\u05d3\u05d9</span>' :
                          '<span class="badge badge-muted" style="font-size:.65rem;margin-right:6px">\u26ab \u05e2\u05d1\u05e8</span>';
     const opacity = status === 'past' ? 'opacity:.6' : '';
+    const evSlots = data.slots || [];
+    const timeRange = evSlots.length > 0 ? evSlots[0].label.split(' - ')[0] + ' - ' + evSlots[evSlots.length-1].label.split(' - ')[1] : '';
+    const address = data.eventAddress || ev.eventAddress || '';
     return `<div class="event-card" style="${opacity};cursor:pointer" onclick="if(!event.target.closest('button'))openEvent('${ev.id}')">
-      <div class="ec-header"><div class="ec-name">${evTitle} ${statusBadge}</div><div class="ec-date" style="direction:ltr">${dateStr}</div></div>
-      ${ev.contactName ? `<div style="font-size:.75rem;color:var(--muted);margin-bottom:6px">&#128100; ${esc(ev.contactName)}</div>` : ''}
+      <div class="ec-header"><div class="ec-name">${evTitle} ${statusBadge}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:.75rem;color:var(--muted);margin:6px 0 8px;padding:8px 10px;background:var(--bg);border-radius:10px">
+        <div>📅 <strong style="color:var(--text)">${dateStr}</strong></div>
+        <div>🕐 <strong style="color:var(--text)">${timeRange || '-'}</strong></div>
+        ${ev.contactName ? `<div>👤 ${esc(ev.contactName)}${ev.contactPhone ? ' | ' + esc(ev.contactPhone) : ''}</div>` : '<div></div>'}
+        ${address ? `<div>📍 ${esc(address)}</div>` : '<div></div>'}
+      </div>
       <div class="ec-stats">
-        ${status === 'today' ? `<span style="color:var(--green)">&#9679; ${ac} \u05e0\u05d5\u05db\u05d7\u05d9\u05dd</span>` : ''}
-        <span>&#128100; ${totalGuests} \u05d1\u05d9\u05e7\u05e8\u05d5</span>
-        <span>&#128203; ${totalRegs} \u05e0\u05e8\u05e9\u05de\u05d5</span>
+        ${status === 'today' ? `<span style="color:var(--green)">&#9679; ${ac} נוכחים</span>` : ''}
+        <span>&#128100; ${totalGuests} ביקרו</span>
+        <span>&#128203; ${totalRegs} נרשמו</span>
+        <span>${data.numSlots || 0} סבבים</span>
       </div>
       <div class="ec-actions">
         ${status !== 'past' ? `<button class="btn-sm orange" onclick="editEvent('${ev.id}')">&#9998; \u05e2\u05e8\u05d9\u05db\u05d4</button>` : ''}
