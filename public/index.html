@@ -1108,6 +1108,7 @@ async function syncFromServer() {
       if (activeEventId) {
         try {
           const full = await api('GET', '/events/' + activeEventId + '/full');
+          full._serverId = full.id || activeEventId;
           localStorage.setItem(storageKeyFor(activeEventId), JSON.stringify(full));
           S = { ...defaultState(), ...full };
         } catch(e) {}
@@ -1181,10 +1182,13 @@ setInterval(async () => {
     }
     // Sync active event full data
     if (activeEventId) {
-      const full = await api('GET', '/events/' + activeEventId + '/full');
-      localStorage.setItem(storageKeyFor(activeEventId), JSON.stringify(full));
-      S = { ...defaultState(), ...full };
-      renderAll();
+      try {
+        const full = await api('GET', '/events/' + activeEventId + '/full');
+        full._serverId = full.id || activeEventId;
+        localStorage.setItem(storageKeyFor(activeEventId), JSON.stringify(full));
+        S = { ...defaultState(), ...full };
+        renderAll();
+      } catch(e2) {}
     }
   } catch(e) {}
 }, 5000);
@@ -1805,39 +1809,43 @@ function saveSetup() {
   saveRegistry(reg);
   saveClientFromEvent();
 
-  // Create/update on server — use PUT if already exists, POST if new
+  // Sync to server — track if this event already has a server ID
   if (apiToken) {
     _syncPaused = true;
+    const body = { clientName: S.clientName, eventName: S.eventName, contactName: S.contactName,
+      contactPhone: S.contactPhone, date, time, numSlots: ns, slotDurationMin: dur,
+      maxCapacity: mc, attractions: S.attractions, eventAddress: S.eventAddress };
     (async () => {
       try {
-        const body = { clientName: S.clientName, eventName: S.eventName, contactName: S.contactName,
-          contactPhone: S.contactPhone, date, time, numSlots: ns, slotDurationMin: dur,
-          maxCapacity: mc, attractions: S.attractions, eventAddress: S.eventAddress };
-        // Try PUT first (update existing)
-        let res = await fetch('/api/events/' + activeEventId, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
-          body: JSON.stringify(body)
-        });
-        if (res.status === 404) {
-          // Not on server yet — create new
-          res = await fetch('/api/events', {
+        const serverId = S._serverId || null;
+        if (serverId) {
+          // Update existing server event
+          await fetch('/api/events/' + serverId, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
+            body: JSON.stringify(body)
+          });
+        } else {
+          // Create new server event
+          const res = await fetch('/api/events', {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
             body: JSON.stringify(body)
           });
           if (res.ok) {
             const data = await res.json();
             if (data.event) {
-              // Switch to server's ID
+              // Store server ID and switch to it
               const oldId = activeEventId;
-              activeEventId = data.event.id;
+              S._serverId = data.event.id;
               S.clientToken = data.event.clientToken;
+              activeEventId = data.event.id;
               localStorage.removeItem(storageKeyFor(oldId));
               localStorage.setItem('eventGateActiveEvent', activeEventId);
               save();
-              // Update registry with server ID
+              // Update registry
               const reg2 = loadRegistry();
               const ri = reg2.findIndex(e => e.id === oldId);
               if (ri >= 0) { reg2[ri].id = activeEventId; reg2[ri].clientToken = data.event.clientToken; }
+              else { reg2.push({ id: activeEventId, clientName: S.clientName, eventName: S.eventName, contactName: S.contactName, contactPhone: S.contactPhone, date, clientToken: data.event.clientToken, attractions: S.attractions, eventAddress: S.eventAddress, createdAt: Date.now() }); }
               saveRegistry(reg2);
               updateClientLinkCard();
             }
@@ -1845,7 +1853,7 @@ function saveSetup() {
         }
         console.log('Event synced to server');
       } catch(e) { console.log('Server sync:', e.message); }
-      setTimeout(() => { _syncPaused = false; }, 2000);
+      setTimeout(() => { _syncPaused = false; }, 3000);
     })();
   }
 
