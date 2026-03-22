@@ -254,11 +254,19 @@ app.post('/api/events/:id/register', registerLimiter, (req, res) => {
 
   const { name, phone, slotIndex, participants } = req.body;
   if (!name || name.trim().length === 0) return res.status(400).json({ error: 'נא להזין שם' });
+  if (!phone || phone.trim().length < 9) return res.status(400).json({ error: 'נא להזין מספר טלפון' });
+
+  // Check duplicate phone registration
+  const normalNewPhone = phone.replace(/[^0-9]/g, '');
+  const existingReg = Object.values(ev.preRegs).find(r => r.phone && r.phone.replace(/[^0-9]/g, '') === normalNewPhone);
+  if (existingReg) {
+    return res.status(400).json({ error: 'מספר הטלפון כבר רשום לאירוע זה', existingCode: existingReg.code, existingSlot: existingReg.slotIndex, existingParticipants: existingReg.participants });
+  }
   if (slotIndex === undefined || slotIndex < 0 || slotIndex >= ev.slots.length) {
     return res.status(400).json({ error: 'חלון זמן לא תקין' });
   }
 
-  const pCount = Math.max(1, Math.min(20, parseInt(participants) || 1));
+  const pCount = Math.max(1, Math.min(4, parseInt(participants) || 1));
   const slotParticipants = Object.values(ev.preRegs).filter(r => r.slotIndex === slotIndex)
     .reduce((sum, r) => sum + (r.participants || 1), 0);
   if (slotParticipants + pCount > ev.maxCapacity) {
@@ -374,6 +382,23 @@ app.post('/api/members', (req, res) => {
 
 app.get('/api/members', requireAdmin, (req, res) => {
   res.json({ members: db.members || [] });
+});
+
+// Update registration (by phone — allows guest to change participant count)
+app.put('/api/events/:id/register', (req, res) => {
+  const ev = db.events[req.params.id];
+  if (!ev || !ev.configured) return res.status(404).json({ error: 'אירוע לא נמצא' });
+  const { phone, participants, slotIndex } = req.body;
+  if (!phone) return res.status(400).json({ error: 'נא להזין מספר טלפון' });
+  const normalPhone = phone.replace(/[^0-9]/g, '');
+  const entry = Object.entries(ev.preRegs).find(([, r]) => r.phone && r.phone.replace(/[^0-9]/g, '') === normalPhone);
+  if (!entry) return res.status(404).json({ error: 'לא נמצאה הרשמה עם מספר זה' });
+  const [code, reg] = entry;
+  if (reg.arrived) return res.status(400).json({ error: 'לא ניתן לעדכן — כבר נכנסת לאירוע' });
+  if (participants !== undefined) reg.participants = Math.max(1, Math.min(4, parseInt(participants) || 1));
+  if (slotIndex !== undefined && slotIndex >= 0 && slotIndex < ev.slots.length) reg.slotIndex = parseInt(slotIndex);
+  saveDB();
+  res.json({ code, reg });
 });
 
 // ========== API: RATINGS ==========

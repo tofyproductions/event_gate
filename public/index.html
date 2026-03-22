@@ -3918,6 +3918,9 @@ document.getElementById('shareModal').addEventListener('click', function(e) { if
 </div>
 <script>
 function checkAdminLogin() {
+  // Never show login for public views (client, register, walk-in)
+  const pp = new URLSearchParams(window.location.search);
+  if (pp.get('client') || pp.get('event') || pp.get('selfcheckin') || isClientMode) return;
   if (!localStorage.getItem('eventGateAdminToken')) {
     document.getElementById('adminLoginOverlay').style.display = 'flex';
   }
