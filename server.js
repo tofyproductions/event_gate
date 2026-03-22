@@ -135,8 +135,8 @@ app.get('/api/events', requireAdmin, (req, res) => {
     configured: ev.configured, startTime: ev.startTime,
     numSlots: ev.numSlots, maxCapacity: ev.maxCapacity,
     attractions: ev.attractions, eventAddress: ev.eventAddress,
-    guestCount: Object.keys(ev.guests || {}).length,
-    preRegCount: Object.keys(ev.preRegs || {}).length,
+    guestCount: Object.values(ev.guests || {}).reduce((sum, g) => sum + (g.groupSize || 1), 0),
+    preRegCount: Object.values(ev.preRegs || {}).reduce((sum, r) => sum + (r.participants || 1), 0),
     activeCount: activeCount(ev),
     createdAt: ev.createdAt,
   }));
@@ -177,9 +177,9 @@ app.get('/api/client/:token', (req, res) => {
     slots: ev.slots, numSlots: ev.numSlots, maxCapacity: ev.maxCapacity,
     attractions: ev.attractions, eventAddress: ev.eventAddress,
     date: ev.date, activeCount: ac,
-    totalGuests: Object.keys(ev.guests || {}).length,
-    totalRegs: preRegs.length,
-    pendingRegs: preRegs.filter(r => !r.arrived).length,
+    totalGuests: Object.values(ev.guests || {}).reduce((sum, g) => sum + (g.groupSize || 1), 0),
+    totalRegs: preRegs.reduce((sum, r) => sum + (r.participants || 1), 0),
+    pendingRegs: preRegs.filter(r => !r.arrived).reduce((sum, r) => sum + (r.participants || 1), 0),
   });
 });
 
