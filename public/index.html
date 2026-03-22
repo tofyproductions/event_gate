@@ -1132,8 +1132,9 @@ async function syncToServer() {
 // Override save() to also sync to server
 const _origSave = typeof save === 'function' ? save : null;
 
-// Sync from server immediately on page load if token exists
-(async () => {
+// Sync from server on page load (delayed to run after INIT)
+let _syncDone = false;
+setTimeout(async () => {
   if (!apiToken) {
     const urlToken = new URLSearchParams(window.location.search).get('admin');
     if (urlToken) {
@@ -1142,17 +1143,24 @@ const _origSave = typeof save === 'function' ? save : null;
       history.replaceState(null, '', window.location.pathname + window.location.hash);
     }
   }
-  if (apiToken) {
+  if (apiToken && !isClientMode) {
     await syncFromServer();
+    _syncDone = true;
+    renderHome();
     renderAll();
-    if (typeof renderHome === 'function') renderHome();
-    if (typeof showPage === 'function') showPage('home');
+    // If we're on setup page for a new event, stay there; otherwise go home
+    const currentPage = document.querySelector('.page.active');
+    if (!currentPage || currentPage.id === 'page-setup') {
+      const reg = loadRegistry();
+      if (reg.length > 0) showPage('home');
+    }
   }
-})();
+}, 100);
 
 // Auto-sync every 5 seconds
+let _syncPaused = false;
 setInterval(async () => {
-  if (!apiToken) return;
+  if (!apiToken || _syncPaused) return;
   try {
     // Always sync registry (event list)
     const data = await api('GET', '/events');
@@ -1592,18 +1600,21 @@ function editEvent(id) {
   showPage('setup');
 }
 
-function deleteEvent(id) {
+async function deleteEvent(id) {
   if (!confirm('למחוק את האירוע? פעולה בלתי הפיכה!')) return;
+  _syncPaused = true;
+  // Delete from server FIRST
+  if (apiToken) {
+    try { await fetch('/api/events/' + id, { method: 'DELETE', headers: { 'x-admin-token': apiToken } }); }
+    catch(e) {}
+  }
   localStorage.removeItem(storageKeyFor(id));
   const reg = loadRegistry().filter(e => e.id !== id);
   saveRegistry(reg);
   if (activeEventId === id) { activeEventId = null; S = defaultState(); }
-  // Delete from server
-  if (apiToken) {
-    fetch('/api/events/' + id, { method: 'DELETE', headers: { 'x-admin-token': apiToken } }).catch(() => {});
-  }
   showSuccess('האירוע נמחק');
   renderHome();
+  setTimeout(() => { _syncPaused = false; }, 3000);
 }
 
 function formatPhoneForWA(phone) {
