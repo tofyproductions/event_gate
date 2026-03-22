@@ -548,8 +548,8 @@
     </div>
   </div>
 
-  <!-- Sharing (shown after setup) -->
-  <div class="card" id="clientLinkCard" style="display:none">
+  <!-- Sharing (hidden in setup — accessed from event card) -->
+  <div class="card" id="clientLinkCard" style="display:none!important">
     <div class="card-title">&#128279; שיתוף ושיווק</div>
 
     <!-- Unified WA to client -->
@@ -581,8 +581,8 @@
     </div>
   </div>
 
-  <!-- Marketing text generator -->
-  <div class="card" id="marketingCard" style="display:none">
+  <!-- Marketing text generator (hidden in setup — accessed from event card) -->
+  <div class="card" id="marketingCard" style="display:none!important">
     <div class="card-title">&#128640; מלל שיווקי לפרסום</div>
     <textarea id="marketingText" rows="6" style="width:100%;padding:12px 14px;background:var(--bg);border:2px solid var(--input-border);border-radius:12px;color:var(--text);font-size:.9rem;font-family:inherit;resize:vertical;outline:none;line-height:1.6;margin-bottom:10px"></textarea>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1507,6 +1507,7 @@ function renderHomeList(el, reg) {
         <button class="btn-sm blue" onclick="waQuickStaff('${ev.id}')" style="flex:1;padding:8px;font-size:.7rem">&#128188; לעובד</button>
         <button class="btn-sm orange" onclick="waQuickQR('${ev.id}')" style="flex:1;padding:8px;font-size:.7rem">&#128248; QR למזדמן</button>
       </div>
+      <button class="btn-primary blue" onclick="openShareModal('${ev.id}')" style="margin-top:8px;padding:10px;font-size:.8rem">&#128279; שיתוף ושיווק</button>
     </div>`;
   }
 
@@ -3800,6 +3801,82 @@ if (!isClientMode) {
   </div>
 </div>
 
+
+<!-- Share Modal -->
+<div id="shareModal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.7);align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto">
+  <div style="background:var(--card);border-radius:16px;padding:20px;max-width:420px;width:92%;margin-bottom:40px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:1rem;font-weight:700">🔗 שיתוף ושיווק</div>
+      <button onclick="closeShareModal()" style="background:none;border:none;color:var(--muted);font-size:1.5rem;cursor:pointer">&times;</button>
+    </div>
+    <div id="shareModalEventName" style="font-size:.85rem;color:var(--blue);font-weight:600;margin-bottom:14px"></div>
+
+    <div style="font-size:.75rem;font-weight:600;margin-bottom:6px;color:var(--green)">📝 קישור הרשמה (להפצה)</div>
+    <div style="display:flex;align-items:center;gap:6px;background:var(--bg);padding:8px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:12px">
+      <span id="smRegLink" style="flex:1;font-size:.65rem;color:var(--muted);direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button class="btn-sm blue" onclick="navigator.clipboard.writeText(document.getElementById('smRegLink').textContent).then(()=>showSuccess('הועתק!'))">העתק</button>
+    </div>
+
+    <div style="font-size:.75rem;font-weight:600;margin-bottom:6px;color:var(--blue)">📊 קישור צפייה ללקוח</div>
+    <div style="display:flex;align-items:center;gap:6px;background:var(--bg);padding:8px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:12px">
+      <span id="smClientLink" style="flex:1;font-size:.65rem;color:var(--muted);direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button class="btn-sm blue" onclick="navigator.clipboard.writeText(document.getElementById('smClientLink').textContent).then(()=>showSuccess('הועתק!'))">העתק</button>
+    </div>
+
+    <button class="btn-primary green" onclick="waQuickClient(shareModalEventId)" style="margin-bottom:8px;padding:12px;font-size:.9rem">📲 שלח הכל ללקוח בוואצאפ</button>
+
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px">
+      <div style="font-size:.75rem;font-weight:600;margin-bottom:8px">🚀 מלל שיווקי לפרסום</div>
+      <textarea id="smMarketingText" rows="5" style="width:100%;padding:10px;background:var(--bg);border:2px solid var(--input-border);border-radius:10px;color:var(--text);font-size:.8rem;font-family:inherit;resize:vertical;line-height:1.5;margin-bottom:8px"></textarea>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-sm blue" onclick="generateShareModalMarketing()" style="flex:1;padding:8px">🔄 מלל חדש</button>
+        <button class="btn-sm green" onclick="navigator.clipboard.writeText(document.getElementById('smMarketingText').value).then(()=>showSuccess('הועתק!'));" style="flex:1;padding:8px">📋 העתק</button>
+        <button class="btn-sm green" onclick="window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('smMarketingText').value),'_blank')" style="flex:1;padding:8px">💬 וואצאפ</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+let shareModalEventId = null;
+function openShareModal(eventId) {
+  shareModalEventId = eventId;
+  const data = loadData(eventId);
+  const reg = loadRegistry();
+  const ev = reg.find(e => e.id === eventId);
+  if (!ev) return;
+  const base = window.location.origin + window.location.pathname;
+  document.getElementById('shareModalEventName').textContent = (data.eventName ? data.eventName + ' — ' : '') + (data.clientName || ev.clientName || '');
+  document.getElementById('smRegLink').textContent = base + '?event=' + eventId + '#register';
+  document.getElementById('smClientLink').textContent = data.clientToken ? base + '?client=' + data.clientToken : 'לא זמין';
+  generateShareModalMarketing();
+  document.getElementById('shareModal').style.display = 'flex';
+}
+function closeShareModal() { document.getElementById('shareModal').style.display = 'none'; shareModalEventId = null; }
+function generateShareModalMarketing() {
+  if (!shareModalEventId) return;
+  const data = loadData(shareModalEventId);
+  const reg = loadRegistry();
+  const ev = reg.find(e => e.id === shareModalEventId);
+  if (!ev) return;
+  const base = window.location.origin + window.location.pathname;
+  const regUrl = base + '?event=' + shareModalEventId + '#register';
+  const templates = typeof marketingTemplates !== 'undefined' ? marketingTemplates : null;
+  if (templates && templates.length > 0) {
+    const t = templates[Math.floor(Math.random() * templates.length)];
+    const evTitle = data.eventName || data.clientName || 'אירוע';
+    const date = ev.date || '';
+    const slots = data.slots || [];
+    const timeRange = slots.length > 0 ? slots[0].label.split(' - ')[0] + ' - ' + slots[slots.length-1].label.split(' - ')[1] : '';
+    const attr = (data.attractions || '').split('\n').filter(a => a.trim()).join(', ');
+    let txt = t.replace(/\{name\}/g, evTitle).replace(/\{date\}/g, date).replace(/\{time\}/g, timeRange).replace(/\{attractions\}/g, attr).replace(/\{link\}/g, regUrl).replace(/\{address\}/g, data.eventAddress || ev.eventAddress || '');
+    document.getElementById('smMarketingText').value = txt;
+  } else {
+    const evTitle = data.eventName || data.clientName || 'אירוע';
+    document.getElementById('smMarketingText').value = '🎉 ' + evTitle + (ev.date ? ' | ' + ev.date : '') + '\n\nבואו לאירוע חינמי!\n\nלהרשמה: ' + regUrl + '\n\n🌈 חברים של טופי בע״מ';
+  }
+}
+document.getElementById('shareModal').addEventListener('click', function(e) { if (e.target === this) closeShareModal(); });
+</script>
 
 <!-- Admin Token Login -->
 <div id="adminLoginOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.8);align-items:center;justify-content:center">
