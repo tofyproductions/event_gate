@@ -1132,10 +1132,9 @@ async function syncToServer() {
 // Override save() to also sync to server
 const _origSave = typeof save === 'function' ? save : null;
 
-// Patch: after initial load, try to sync from server
-setTimeout(async () => {
+// Sync from server immediately on page load if token exists
+(async () => {
   if (!apiToken) {
-    // Check if token is in URL
     const urlToken = new URLSearchParams(window.location.search).get('admin');
     if (urlToken) {
       apiToken = urlToken;
@@ -1147,8 +1146,9 @@ setTimeout(async () => {
     await syncFromServer();
     renderAll();
     if (typeof renderHome === 'function') renderHome();
+    if (typeof showPage === 'function') showPage('home');
   }
-}, 500);
+})();
 
 // Auto-sync every 5 seconds
 setInterval(async () => {
