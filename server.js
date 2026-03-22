@@ -290,18 +290,32 @@ app.post('/api/events/:id/checkin', requireAdmin, (req, res) => {
   const ev = db.events[req.params.id];
   if (!ev || !ev.configured) return res.status(404).json({ error: 'אירוע לא נמצא' });
 
-  const { code, name, groupSize, type } = req.body;
+  const { code, name, groupSize, type, phone } = req.body;
 
   if (type === 'walkin') {
     // Walk-in checkin
     if (!name) return res.status(400).json({ error: 'נא להזין שם' });
+    if (!phone || phone.trim().length < 9) return res.status(400).json({ error: 'נא להזין מספר טלפון' });
+
+    // Check if phone already exists in pre-regs or guests
+    const normalPhone = phone.replace(/[^0-9]/g, '');
+    const existingReg = Object.values(ev.preRegs).find(r => r.phone && r.phone.replace(/[^0-9]/g, '') === normalPhone);
+    if (existingReg) {
+      return res.status(400).json({ error: `מספר הטלפון כבר רשום מראש (קוד: ${existingReg.code})` });
+    }
+    const existingGuest = Object.values(ev.guests).filter(g => !g.checkoutTime).find(g => g.phone && g.phone.replace(/[^0-9]/g, '') === normalPhone);
+    if (existingGuest) {
+      return res.status(400).json({ error: 'מספר הטלפון כבר נמצא באירוע' });
+    }
+
     const gs = Math.max(1, Math.min(20, parseInt(groupSize) || 1));
     const ac = activeCount(ev);
     if (ac + gs > ev.maxCapacity) return res.status(400).json({ error: 'האירוע מלא' });
 
     const id = randomId();
     ev.guests[id] = {
-      id, name: sanitize(name), checkinTime: Date.now(), checkoutTime: null,
+      id, name: sanitize(name), phone: sanitize(phone, 20),
+      checkinTime: Date.now(), checkoutTime: null,
       type: 'walkin', regCode: null, slotIndex: -1, groupSize: gs,
     };
     saveDB();

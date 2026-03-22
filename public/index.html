@@ -764,6 +764,10 @@
           <input type="text" id="ciName" placeholder="הכניסו שם" autocomplete="name" />
         </div>
         <div class="form-group">
+          <label>מספר טלפון</label>
+          <input type="tel" id="ciPhone" placeholder="050-1234567" autocomplete="tel" style="direction:ltr;text-align:right" />
+        </div>
+        <div class="form-group">
           <label>כמות משתתפים</label>
           <div style="display:flex;align-items:center;gap:10px">
             <button type="button" class="btn-sm blue" onclick="document.getElementById('ciGroupSize').value=Math.max(1,parseInt(document.getElementById('ciGroupSize').value||1)-1)" style="width:36px;height:36px;font-size:1.1rem;border-radius:50%;display:flex;align-items:center;justify-content:center">-</button>
@@ -2251,6 +2255,16 @@ function doWalkinCheckin() {
   if (S.startTime && Date.now() < S.startTime) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
   const name = document.getElementById('ciName').value.trim();
   if (!name) { showError('נא להזין שם'); return; }
+  const phone = document.getElementById('ciPhone').value.trim();
+  if (!phone || phone.replace(/[^0-9]/g, '').length < 9) { showError('נא להזין מספר טלפון תקין'); return; }
+
+  // Check duplicate phone locally
+  const normalPhone = phone.replace(/[^0-9]/g, '');
+  const existingReg = Object.values(S.preRegs).find(r => r.phone && r.phone.replace(/[^0-9]/g, '') === normalPhone);
+  if (existingReg) { showError(`מספר הטלפון כבר רשום מראש (קוד: ${existingReg.code})`); return; }
+  const existingGuest = Object.values(S.guests).filter(g => !g.checkoutTime).find(g => g.phone && g.phone.replace(/[^0-9]/g, '') === normalPhone);
+  if (existingGuest) { showError('מספר הטלפון כבר נמצא באירוע'); return; }
+
   const walkinGroupEl = document.getElementById('ciGroupSize');
   const walkinGroup = walkinGroupEl ? Math.max(1, Math.min(20, parseInt(walkinGroupEl.value) || 1)) : 1;
 
@@ -2267,13 +2281,13 @@ function doWalkinCheckin() {
 
   const id = randomId();
   const currentSlot = S.slots.find(s => now >= s.startTime && now < s.endTime);
-  S.guests[id] = { id, name: name.slice(0, 100), checkinTime: now, checkoutTime: null, type: 'walkin', regCode: null, slotIndex: currentSlot ? currentSlot.index : -1, groupSize: walkinGroup };
+  S.guests[id] = { id, name: name.slice(0, 100), phone: phone.slice(0, 20), checkinTime: now, checkoutTime: null, type: 'walkin', regCode: null, slotIndex: currentSlot ? currentSlot.index : -1, groupSize: walkinGroup };
   save();
   // Sync walk-in to server
   if (apiToken) {
     fetch('/api/events/' + activeEventId + '/checkin', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
-      body: JSON.stringify({ name: name.slice(0, 100), groupSize: walkinGroup, type: 'walkin' })
+      body: JSON.stringify({ name: name.slice(0, 100), phone: phone.slice(0, 20), groupSize: walkinGroup, type: 'walkin' })
     }).catch(() => {});
   }
 
@@ -2281,6 +2295,7 @@ function doWalkinCheckin() {
   ciCheckinTime = now;
   localStorage.setItem('eventGateCheckin', JSON.stringify({ id, checkinTime: now }));
   document.getElementById('ciName').value = '';
+  document.getElementById('ciPhone').value = '';
   if (navigator.vibrate) navigator.vibrate(100);
   showCheckinActive(name, 'walkin');
   showSuccess(`${name} נכנס/ה בהצלחה!`);
