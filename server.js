@@ -1,3 +1,5 @@
+process.env.TZ = 'Asia/Jerusalem';
+
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -97,7 +99,7 @@ function randomId() { return crypto.randomBytes(6).toString('hex'); }
 function sanitize(str, max = 100) { return (str || '').trim().slice(0, max); }
 
 function formatHM(ts) {
-  return new Date(ts).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  return new Date(ts).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' });
 }
 
 function generateSlots(startTime, numSlots, durMin) {
@@ -191,7 +193,7 @@ app.post('/api/events', requireAdmin, (req, res) => {
   if (!date || !time) return res.status(400).json({ error: 'תאריך ושעה נדרשים' });
 
   const id = randomId();
-  const startTime = new Date(`${date}T${time}`).getTime();
+  const startTime = new Date(`${date}T${time}:00+02:00`).getTime();
   if (isNaN(startTime)) return res.status(400).json({ error: 'תאריך/שעה לא תקינים' });
 
   const ns = Math.max(1, Math.min(20, parseInt(numSlots) || 5));
