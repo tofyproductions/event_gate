@@ -2073,6 +2073,7 @@ function updateCiTimer() {
 
 function doCodeCheckin() {
   if (!S.configured) { showError('האירוע טרם הוגדר'); return; }
+  if (S.startTime && Date.now() < S.startTime) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
   const input = document.getElementById('ciCode').value.trim();
   if (!input) { showError('נא להזין קוד או מספר טלפון'); return; }
 
@@ -2133,6 +2134,7 @@ function doCodeCheckin() {
 function doWalkinCheckin() {
   if (!document.getElementById('walkinTerms').checked) { showError('יש לאשר את תקנון הפעילות'); return; }
   if (!S.configured) { showError('האירוע טרם הוגדר'); return; }
+  if (S.startTime && Date.now() < S.startTime) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
   const name = document.getElementById('ciName').value.trim();
   if (!name) { showError('נא להזין שם'); return; }
   const walkinGroupEl = document.getElementById('ciGroupSize');
@@ -2443,7 +2445,8 @@ function renderDashboard() {
       const dur = now - g.checkinTime;
       const durCls = dur > 7200000 ? 'dur-long' : dur > 3600000 ? 'dur-warn' : '';
       const isPre = g.type === 'preregistered';
-      return `<div class="guest-card ${isPre ? 'prereg' : ''}"><div><div class="guest-name">${esc(g.name)}${g.groupSize > 1 ? ' <span style="color:var(--blue);font-size:.7rem">(' + g.groupSize + ' משתתפים)</span>' : ''} <span class="type-tag ${isPre ? 'tag-prereg' : 'tag-walkin'}">${isPre ? 'מראש' : 'הזדמן'}</span></div><div class="guest-sub">נכנס/ה ב-${formatHM(g.checkinTime)}</div></div><div class="guest-right"><div class="guest-dur ${durCls}" data-ci="${g.checkinTime}">${formatDur(dur)}</div><button class="btn-sm orange" onclick="adminCheckout('${g.id}')">הוצא</button></div></div>`;
+      const gsLabel = g.groupSize > 1 ? ` <span style="color:var(--blue);font-size:.7rem;cursor:pointer" onclick="editGroupSize('${g.id}')" title="לחץ לעריכה">(${g.groupSize} משתתפים ✏️)</span>` : ` <span style="color:var(--muted);font-size:.65rem;cursor:pointer" onclick="editGroupSize('${g.id}')" title="לחץ לעריכה">(1 ✏️)</span>`;
+      return `<div class="guest-card ${isPre ? 'prereg' : ''}"><div><div class="guest-name">${esc(g.name)}${gsLabel} <span class="type-tag ${isPre ? 'tag-prereg' : 'tag-walkin'}">${isPre ? 'מראש' : 'הזדמן'}</span></div><div class="guest-sub">נכנס/ה ב-${formatHM(g.checkinTime)}</div></div><div class="guest-right"><div class="guest-dur ${durCls}" data-ci="${g.checkinTime}">${formatDur(dur)}</div><button class="btn-sm orange" onclick="adminCheckout('${g.id}')">הוצא</button></div></div>`;
     }).join('');
   }
 
@@ -2510,9 +2513,24 @@ function adminCheckout(id) {
   renderAll();
 }
 
+function editGroupSize(guestId) {
+  const g = S.guests[guestId];
+  if (!g || g.checkoutTime) return;
+  const current = g.groupSize || 1;
+  const newSize = prompt(`כמות משתתפים עבור ${g.name} (נוכחי: ${current}):`, current);
+  if (newSize === null) return;
+  const ns = Math.max(1, Math.min(20, parseInt(newSize) || current));
+  if (ns === current) return;
+  g.groupSize = ns;
+  save();
+  showSuccess(`עודכן: ${g.name} — ${ns} משתתפים`);
+  renderAll();
+}
+
 function adminCheckin(code) {
   const r = S.preRegs[code];
   if (!r || r.arrived) return;
+  if (S.startTime && Date.now() < S.startTime) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
   const ac = activeCount();
   const gs = r.participants || 1;
   if (ac + gs > S.maxCapacity) { showError('האירוע מלא — אין מקום ל-' + gs + ' משתתפים'); return; }
