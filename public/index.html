@@ -3091,11 +3091,11 @@ function renderClientView() {
   const cvTitle = S.eventName ? `${S.eventName} — ${S.clientName}` : (S.clientName || 'האירוע');
   document.getElementById('cvClientName').textContent = cvTitle;
 
-  // Stats
-  document.getElementById('cvTotal').textContent = Object.keys(S.guests).length;
+  // Stats — count participants, not entries
+  document.getElementById('cvTotal').textContent = Object.values(S.guests).reduce((sum, g) => sum + (g.groupSize || 1), 0);
   const regs = Object.values(S.preRegs);
-  document.getElementById('cvRegTotal').textContent = regs.length;
-  document.getElementById('cvRegPending').textContent = regs.filter(r => !r.arrived).length;
+  document.getElementById('cvRegTotal').textContent = regs.reduce((sum, r) => sum + (r.participants || 1), 0);
+  document.getElementById('cvRegPending').textContent = regs.filter(r => !r.arrived).reduce((sum, r) => sum + (r.participants || 1), 0);
 
   // Status
   const statusEl = document.getElementById('cvStatus');
@@ -3117,14 +3117,15 @@ function renderClientView() {
     const isCurrent = currentSlotIdx === slot.index;
     const isPast = now >= slot.endTime;
     const slotRegs = regs.filter(r => r.slotIndex === slot.index);
-    const regPctSlot = Math.min(slotRegs.length / S.maxCapacity * 100, 100);
+    const slotParticipants = slotRegs.reduce((sum, r) => sum + (r.participants || 1), 0);
+    const regPctSlot = Math.min(slotParticipants / S.maxCapacity * 100, 100);
     let barColor = 'var(--green)';
     if (regPctSlot >= 90) barColor = 'var(--red)';
     else if (regPctSlot >= 70) barColor = 'var(--yellow)';
     let cls = '';
     if (isCurrent) cls = 'slot-active';
     else if (isPast) cls = 'slot-past';
-    return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}</div><div class="slot-bar-wrap"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div></div></div><span style="color:var(--muted);font-size:.8rem">${slotRegs.length}/${S.maxCapacity}</span></div>`;
+    return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}</div><div class="slot-bar-wrap"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div></div></div><span style="color:var(--muted);font-size:.8rem">${slotParticipants}/${S.maxCapacity}</span></div>`;
   }).join('');
 }
 
