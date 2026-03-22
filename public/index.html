@@ -2460,7 +2460,21 @@ function renderDashboard() {
       const durCls = dur > 7200000 ? 'dur-long' : dur > 3600000 ? 'dur-warn' : '';
       const isPre = g.type === 'preregistered';
       const gsLabel = g.groupSize > 1 ? ` <span style="color:var(--blue);font-size:.7rem;cursor:pointer" onclick="editGroupSize('${g.id}')" title="לחץ לעריכה">(${g.groupSize} משתתפים ✏️)</span>` : ` <span style="color:var(--muted);font-size:.65rem;cursor:pointer" onclick="editGroupSize('${g.id}')" title="לחץ לעריכה">(1 ✏️)</span>`;
-      return `<div class="guest-card ${isPre ? 'prereg' : ''}"><div><div class="guest-name">${esc(g.name)}${gsLabel} <span class="type-tag ${isPre ? 'tag-prereg' : 'tag-walkin'}">${isPre ? 'מראש' : 'הזדמן'}</span></div><div class="guest-sub">נכנס/ה ב-${formatHM(g.checkinTime)}</div></div><div class="guest-right"><div class="guest-dur ${durCls}" data-ci="${g.checkinTime}">${formatDur(dur)}</div><button class="btn-sm orange" onclick="adminCheckout('${g.id}')">הוצא</button></div></div>`;
+      // Check if guest is over their slot time
+      let overSlot = false;
+      let overSlotLabel = '';
+      if (g.slotIndex >= 0 && S.slots && S.slots[g.slotIndex]) {
+        const gSlot = S.slots[g.slotIndex];
+        if (now > gSlot.endTime) {
+          overSlot = true;
+          const overMin = Math.floor((now - gSlot.endTime) / 60000);
+          overSlotLabel = overMin >= 60 ? Math.floor(overMin/60) + ' שע\' ו-' + (overMin%60) + ' דק\'' : overMin + ' דק\'';
+        }
+      }
+      const overStyle = overSlot ? 'border:2px solid var(--red);background:rgba(239,68,68,.08)' : '';
+      const overBadge = overSlot ? `<span style="background:var(--red);color:white;padding:2px 8px;border-radius:10px;font-size:.65rem;font-weight:700;margin-right:6px;animation:pulse 1.5s infinite">⚠ חריגה ${overSlotLabel}</span>` : '';
+      const slotInfo = g.slotIndex >= 0 && S.slots && S.slots[g.slotIndex] ? ` | סבב ${g.slotIndex+1} (${S.slots[g.slotIndex].label})` : '';
+      return `<div class="guest-card ${isPre ? 'prereg' : ''}" style="${overStyle}"><div><div class="guest-name">${esc(g.name)}${gsLabel} ${overBadge}<span class="type-tag ${isPre ? 'tag-prereg' : 'tag-walkin'}">${isPre ? 'מראש' : 'הזדמן'}</span></div><div class="guest-sub">נכנס/ה ב-${formatHM(g.checkinTime)}${slotInfo}</div></div><div class="guest-right"><div class="guest-dur ${durCls}" data-ci="${g.checkinTime}">${formatDur(dur)}</div><button class="btn-sm orange" onclick="adminCheckout('${g.id}')">הוצא</button></div></div>`;
     }).join('');
   }
 
