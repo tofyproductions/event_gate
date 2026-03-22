@@ -2400,11 +2400,12 @@ function renderDashboard() {
   }
 
   const regs = Object.values(S.preRegs);
-  const regPending = regs.filter(r => !r.arrived).length;
-  document.getElementById('dbRegTotal').textContent = regs.length;
-  document.getElementById('dbRegPending').textContent = regPending;
+  const regTotalParticipants = regs.reduce((sum, r) => sum + (r.participants || 1), 0);
+  const regPendingParticipants = regs.filter(r => !r.arrived).reduce((sum, r) => sum + (r.participants || 1), 0);
+  document.getElementById('dbRegTotal').textContent = regTotalParticipants;
+  document.getElementById('dbRegPending').textContent = regPendingParticipants;
   document.getElementById('dbActiveBadge').textContent = ac;
-  document.getElementById('dbRegBadge').textContent = regs.length;
+  document.getElementById('dbRegBadge').textContent = regs.length + (regTotalParticipants > regs.length ? ` (${regTotalParticipants})` : '');
 
   // Slots
   const slotsEl = document.getElementById('dbSlots');
@@ -2432,7 +2433,8 @@ function renderDashboard() {
       else if (isPast) cls = 'slot-past';
       else if (isFuture) cls = 'slot-future';
       const activeLabel = slotActiveGuests > 0 ? `<span style="color:var(--green);font-weight:700;font-size:.75rem;margin-left:6px">👥 ${slotActiveGuests} נוכחים</span>` : '';
-      return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}${activeLabel}</div><div class="slot-bar-wrap" style="position:relative"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div>${activePctSlot > 0 ? `<div style="position:absolute;top:0;right:0;height:100%;width:${activePctSlot}%;background:var(--blue);border-radius:4px;opacity:.5"></div>` : ''}</div></div><span style="color:var(--muted);font-size:.8rem">${slotParticipants}/${S.maxCapacity}</span></div>`;
+      const countLabel = slotActiveGuests > 0 ? `<span style="color:var(--green);font-weight:700">${slotActiveGuests}</span><span style="color:var(--muted)">/${S.maxCapacity}</span>` : (slotParticipants > 0 ? `<span style="color:var(--blue)">${slotParticipants}</span><span style="color:var(--muted)"> נרשמו</span>` : `<span style="color:var(--muted)">0/${S.maxCapacity}</span>`);
+      return `<div class="slot-row ${cls}"><div style="flex:1"><div><span class="slot-label">${slot.label}</span> <span class="slot-num">סבב ${slot.index + 1}</span>${isCurrent ? ' <span class="slot-active-tag">עכשיו</span>' : ''}${activeLabel}</div><div class="slot-bar-wrap" style="position:relative"><div class="slot-bar-fill" style="width:${regPctSlot}%;background:${barColor}"></div>${activePctSlot > 0 ? `<div style="position:absolute;top:0;right:0;height:100%;width:${activePctSlot}%;background:var(--blue);border-radius:4px;opacity:.5"></div>` : ''}</div></div><span style="font-size:.8rem">${countLabel}</span></div>`;
     }).join('');
   }
 
