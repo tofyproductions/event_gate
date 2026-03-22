@@ -1,11 +1,1 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    {
-      "name": "event-gate-static",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "-s", ".", "-l", "3456", "--no-clipboard"],
-      "port": 3456
-    }
-  ]
-}
+{"version":"0.0.1","configurations":[{"name":"event-gate","runtimeExecutable":"node","runtimeArgs":["server.js"],"port":3333}]}

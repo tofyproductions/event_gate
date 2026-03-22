@@ -1980,7 +1980,21 @@ function doRegister() {
   const slotParticipants = regs.filter(r => r.slotIndex === selectedRegSlot).reduce((sum, r) => sum + (r.participants || 1), 0);
   if (slotParticipants + participants > S.maxCapacity) { showError('אין מספיק מקומות בחלון זמן זה (' + (S.maxCapacity - slotParticipants) + ' פנויים)'); renderRegister(); return; }
 
-  const code = randomCode();
+  // Register via server API (primary) + local fallback
+  let code = randomCode();
+  (async () => {
+    try {
+      const res = await fetch('/api/events/' + activeEventId + '/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.slice(0, 100), phone: phone.slice(0, 20), slotIndex: selectedRegSlot, participants })
+      });
+      const data = await res.json();
+      if (res.ok && data.code) {
+        code = data.code; // Use server-generated code
+        document.getElementById('regSuccessCode').textContent = code;
+      } else if (data.error) { showError(data.error); return; }
+    } catch(e) { console.log('Server registration failed, using local:', e.message); }
+  })();
   S.preRegs[code] = {
     code, name: name.slice(0, 100), phone: phone.slice(0, 20),
     registeredAt: Date.now(), arrived: false, slotIndex: selectedRegSlot,
@@ -2130,8 +2144,15 @@ function doWalkinCheckin() {
 
   const id = randomId();
   const currentSlot = S.slots.find(s => now >= s.startTime && now < s.endTime);
-  S.guests[id] = { id, name: name.slice(0, 100), checkinTime: now, checkoutTime: null, type: 'walkin', regCode: null, slotIndex: currentSlot ? currentSlot.index : -1 };
+  S.guests[id] = { id, name: name.slice(0, 100), checkinTime: now, checkoutTime: null, type: 'walkin', regCode: null, slotIndex: currentSlot ? currentSlot.index : -1, groupSize: walkinGroup };
   save();
+  // Sync walk-in to server
+  if (apiToken) {
+    fetch('/api/events/' + activeEventId + '/checkin', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
+      body: JSON.stringify({ name: name.slice(0, 100), groupSize: walkinGroup, type: 'walkin' })
+    }).catch(() => {});
+  }
 
   ciGuestId = id;
   ciCheckinTime = now;
@@ -2147,6 +2168,12 @@ function doCheckout() {
   const g = S.guests[ciGuestId];
   g.checkoutTime = Date.now();
   save();
+  // Sync checkout to server
+  if (apiToken) {
+    fetch('/api/events/' + activeEventId + '/checkout/' + ciGuestId, {
+      method: 'POST', headers: { 'x-admin-token': apiToken }
+    }).catch(() => {});
+  }
 
   const dur = g.checkoutTime - g.checkinTime;
   document.getElementById('ciDoneDur').textContent = `שהיתם באירוע ${formatDurLong(dur)}`;
@@ -2464,6 +2491,11 @@ function adminCheckout(id) {
   if (!g || g.checkoutTime) return;
   g.checkoutTime = Date.now();
   save();
+  if (apiToken) {
+    fetch('/api/events/' + activeEventId + '/checkout/' + id, {
+      method: 'POST', headers: { 'x-admin-token': apiToken }
+    }).catch(() => {});
+  }
   renderAll();
 }
 
@@ -2473,6 +2505,11 @@ function releaseReg(code) {
   if (!r || r.arrived) return;
   delete S.preRegs[code];
   save();
+  if (apiToken) {
+    fetch('/api/events/' + activeEventId + '/release/' + code, {
+      method: 'POST', headers: { 'x-admin-token': apiToken }
+    }).catch(() => {});
+  }
   renderAll();
 }
 
