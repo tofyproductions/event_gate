@@ -3077,28 +3077,30 @@ function selectLiveTab(eventId) {
 function exportCSV() {
   const now = Date.now();
   const bom = '\uFEFF';
-  let csv = bom + 'שם,סוג,סבב,כניסה,יציאה,משך (דקות),סטטוס\n';
+  let csv = bom + 'שם,טלפון,סוג,סבב,משתתפים,כניסה,יציאה,משך (דקות),סטטוס\n';
 
   activeGuests().forEach(g => {
     const dur = Math.round((now - g.checkinTime) / 60000);
     const type = g.type === 'preregistered' ? 'מראש' : 'הזדמן';
     const slot = g.slotIndex >= 0 ? `סבב ${g.slotIndex + 1}` : '-';
-    csv += `"${csvSafe(g.name)}",${type},${slot},${formatHM(g.checkinTime)},,${dur},נוכח\n`;
+    csv += `"${csvSafe(g.name)}","${csvSafe(g.phone || '')}",${type},${slot},${g.groupSize || 1},${formatHM(g.checkinTime)},,${dur},נוכח\n`;
   });
 
   historyGuests().forEach(g => {
     const dur = Math.round((g.checkoutTime - g.checkinTime) / 60000);
     const type = g.type === 'preregistered' ? 'מראש' : 'הזדמן';
     const slot = g.slotIndex >= 0 ? `סבב ${g.slotIndex + 1}` : '-';
-    csv += `"${csvSafe(g.name)}",${type},${slot},${formatHM(g.checkinTime)},${formatHM(g.checkoutTime)},${dur},יצא\n`;
+    csv += `"${csvSafe(g.name)}","${csvSafe(g.phone || '')}",${type},${slot},${g.groupSize || 1},${formatHM(g.checkinTime)},${formatHM(g.checkoutTime)},${dur},יצא\n`;
   });
 
   Object.values(S.preRegs).filter(r => !r.arrived).forEach(r => {
     const slot = `סבב ${r.slotIndex + 1}`;
-    csv += `"${csvSafe(r.name)}",מראש,${slot},,,0,לא הגיע\n`;
+    csv += `"${csvSafe(r.name)}","${csvSafe(r.phone || '')}",מראש,${slot},${r.participants || 1},,,,לא הגיע\n`;
   });
 
-  csv += `\nסיכום\nסה"כ ביקרו,${Object.keys(S.guests).length}\nנוכחים כרגע,${activeCount()}\nנרשמו מראש,${Object.keys(S.preRegs).length}\n`;
+  const totalParticipants = Object.values(S.guests).reduce((s, g) => s + (g.groupSize || 1), 0);
+  const totalRegsParticipants = Object.values(S.preRegs).reduce((s, r) => s + (r.participants || 1), 0);
+  csv += `\nסיכום\nסה"כ ביקרו (משתתפים),${totalParticipants}\nנוכחים כרגע,${activeCount()}\nנרשמו מראש (משתתפים),${totalRegsParticipants}\n`;
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
