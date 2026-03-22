@@ -938,53 +938,57 @@
       <button class="btn-sm blue" onclick="previewView('prereg')" style="flex:1;padding:8px;font-size:.7rem">&#128203; נרשם מראש</button>
     </div>
   </div>
-  <div class="card">
-    <div class="counter-bar">
-      <div>
-        <div class="counter-big" id="dbCount">0</div>
+  <!-- Command Bar (admin) — unified dashboard -->
+  <div id="dbCommandBar" style="background:linear-gradient(135deg,rgba(59,130,246,.06),rgba(168,85,247,.06));border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px">
+    <!-- Live counter -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:10px">
+      <div style="text-align:center">
+        <div style="font-size:2.8rem;font-weight:900;line-height:1" id="dbCount">0</div>
+        <div style="font-size:.7rem;color:var(--muted)">נוכחים</div>
       </div>
-      <div class="counter-info">
-        <div class="label">נוכחים כרגע</div>
-        <div class="sub">מתוך <span id="dbMax">50</span></div>
+      <div style="font-size:1.5rem;color:var(--border)">/</div>
+      <div style="text-align:center">
+        <div style="font-size:2.8rem;font-weight:900;line-height:1;color:var(--muted)" id="dbMax">50</div>
+        <div style="font-size:.7rem;color:var(--muted)">מקסימום</div>
       </div>
     </div>
-    <div class="progress-bar">
+    <!-- Capacity bar -->
+    <div class="progress-bar" style="margin-bottom:8px">
       <div class="progress-fill" id="dbFill" style="width:0%"></div>
     </div>
-    <div class="status-msg status-ok" id="dbStatus">ממתין לאורחים</div>
-  </div>
-
-  <div class="stats-row">
-    <div class="stat-card"><div class="stat-val" style="color:var(--green)" id="dbTotal">0</div><div class="stat-lbl">סה"כ ביקרו</div></div>
-    <div class="stat-card"><div class="stat-val" style="color:var(--blue)" id="dbRegTotal">0</div><div class="stat-lbl">נרשמו מראש</div></div>
-    <div class="stat-card"><div class="stat-val" style="color:var(--yellow)" id="dbRegPending">0</div><div class="stat-lbl">טרם הגיעו</div></div>
-    <div class="stat-card"><div class="stat-val" style="color:var(--blue)" id="dbAvg">-</div><div class="stat-lbl">שהייה ממוצעת</div></div>
-  </div>
-
-  <!-- Command Bar (admin) -->
-  <div id="dbCommandBar" style="background:linear-gradient(135deg,rgba(59,130,246,.06),rgba(168,85,247,.06));border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px">
-    <div style="font-size:.8rem;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px">🎛️ סרגל פיקוד</div>
+    <!-- Status -->
+    <div class="status-msg status-ok" id="dbStatus" style="margin-bottom:10px">ממתין לאורחים</div>
     <!-- Active slot -->
     <div id="dbActiveSlot" style="text-align:center;font-size:.75rem;color:var(--muted);padding:6px;background:var(--bg);border-radius:8px;margin-bottom:8px;display:none">
       <span id="dbActiveSlotText"></span>
     </div>
-    <!-- Quick stats -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+    <!-- Stats grid -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px">
       <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
         <div style="font-size:1.2rem;font-weight:800;color:var(--green)" id="dbCmdActive">0</div>
         <div style="font-size:.6rem;color:var(--muted)">נוכחים</div>
       </div>
       <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
         <div style="font-size:1.2rem;font-weight:800;color:var(--blue)" id="dbCmdRegs">0</div>
-        <div style="font-size:.6rem;color:var(--muted)">נרשמו</div>
+        <div style="font-size:.6rem;color:var(--muted)">נרשמו מראש</div>
       </div>
       <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
         <div style="font-size:1.2rem;font-weight:800;color:var(--yellow)" id="dbCmdPending">0</div>
         <div style="font-size:.6rem;color:var(--muted)">טרם הגיעו</div>
       </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
+      <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+        <div style="font-size:1.2rem;font-weight:800;color:var(--green)" id="dbTotal">0</div>
+        <div style="font-size:.6rem;color:var(--muted)">סה"כ ביקרו</div>
+      </div>
       <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
         <div style="font-size:1.2rem;font-weight:800;color:var(--orange)" id="dbCmdWalkin">0</div>
         <div style="font-size:.6rem;color:var(--muted)">מזדמנים</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:8px 4px;text-align:center">
+        <div style="font-size:1.2rem;font-weight:800;color:var(--blue)" id="dbAvg">-</div>
+        <div style="font-size:.6rem;color:var(--muted)">שהייה ממוצעת</div>
       </div>
     </div>
     <!-- Active guests with quick checkout -->
@@ -2614,8 +2618,7 @@ function renderDashboard() {
   const regs = Object.values(S.preRegs);
   const regTotalParticipants = regs.reduce((sum, r) => sum + (r.participants || 1), 0);
   const regPendingParticipants = regs.filter(r => !r.arrived).reduce((sum, r) => sum + (r.participants || 1), 0);
-  document.getElementById('dbRegTotal').textContent = regTotalParticipants;
-  document.getElementById('dbRegPending').textContent = regPendingParticipants;
+  // dbRegTotal and dbRegPending now populated via command bar (dbCmdRegs, dbCmdPending)
   document.getElementById('dbActiveBadge').textContent = ac;
 
   // ===== Command Bar (admin) =====
