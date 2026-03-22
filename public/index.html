@@ -3233,7 +3233,13 @@ function renderCalendar() {
       const evData = loadData(ev.id);
       const evSlots = evData.slots || [];
       const evTime = evSlots.length > 0 ? evSlots[0].label.split(' - ')[0] + '-' + evSlots[evSlots.length-1].label.split(' - ')[1] : '';
-      chips += '<div class="cal-ev-chip" style="background:' + color + '20;color:' + color + ';border-right:2px solid ' + color + '">' + esc(evName) + (evTime ? '<div class="cal-ev-time">' + evTime + '</div>' : '') + '</div>';
+      const evClient = ev.clientName || '';
+      const evTitle = ev.eventName || '';
+      chips += '<div class="cal-ev-chip" style="background:' + color + '20;color:' + color + ';border-right:2px solid ' + color + '">' +
+        (evTime ? '<div class="cal-ev-time">' + evTime + '</div>' : '') +
+        (evClient ? '<div style="font-weight:700;font-size:.6rem;line-height:1.2">' + esc(evClient) + '</div>' : '') +
+        (evTitle ? '<div style="font-size:.55rem;opacity:.8;line-height:1.1">' + esc(evTitle) + '</div>' : '') +
+        '</div>';
     });
 
     html += '<div onclick="showCalDay(\'' + dateStr + '\')" class="cal-cell" style="' +
