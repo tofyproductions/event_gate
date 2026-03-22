@@ -2131,7 +2131,8 @@ function doRegister() {
   const name = document.getElementById('regName').value.trim();
   const phone = document.getElementById('regPhone').value.trim();
   if (!name) { showError('נא להזין שם'); return; }
-  if (!phone || phone.replace(/[^0-9]/g, '').length < 9) { showError('נא להזין מספר טלפון תקין'); return; }
+  const cleanP = phone.replace(/[^0-9]/g, '');
+  if (!cleanP.match(/^05\d{8}$/)) { showError('מספר טלפון לא תקין — נדרש מספר ישראלי (05X) עם 10 ספרות'); return; }
   if (selectedRegSlot < 0) { showError('נא לבחור חלון זמן'); return; }
 
   const participants = Math.max(1, Math.min(4, parseInt(document.getElementById('regParticipants').value) || 1));
@@ -2160,17 +2161,17 @@ function doRegister() {
       }
 
       if (data.waitlist) {
-        // Waitlist response
+        // Waitlist response — don't show code (will be sent via WhatsApp when approved)
         document.getElementById('regSuccessName').textContent = name + (participants > 1 ? ' (' + participants + ' משתתפים)' : '');
         document.getElementById('regSuccessSlot').textContent = `סבב ${selectedRegSlot + 1}: ${slot.label}`;
-        document.getElementById('regSuccessCode').textContent = code;
+        document.getElementById('regSuccessCode').textContent = '⏳ ממתין לאישור';
         const regTime = new Date();
         document.getElementById('regSuccessTime').innerHTML = `
           <div style="background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:12px;margin:8px 0">
             <div style="font-weight:700;color:var(--orange);margin-bottom:4px">⏳ נרשמת לרשימת ההמתנה</div>
             <div style="font-size:.8rem;color:var(--muted)">מיקום בתור: ${data.position || '?'}</div>
-            <div style="font-size:.75rem;color:var(--muted);margin-top:4px">הסבב מלא כרגע. אם יתפנה מקום — תקבלו אישור השתתפות.</div>
-            <div style="font-size:.75rem;color:var(--muted);margin-top:2px">שמרו את הקוד: <strong style="color:var(--text)">${code}</strong></div>
+            <div style="font-size:.75rem;color:var(--muted);margin-top:4px">הסבב מלא כרגע. אם יתפנה מקום — תקבלו הודעה בוואצאפ עם קוד כניסה.</div>
+            <div style="font-size:.75rem;color:var(--muted);margin-top:2px">מספר הטלפון שלכם: <strong style="color:var(--text)">${phone}</strong></div>
           </div>`;
       } else {
         // Normal success
@@ -2309,7 +2310,8 @@ function doWalkinCheckin() {
   const name = document.getElementById('ciName').value.trim();
   if (!name) { showError('נא להזין שם'); return; }
   const phone = document.getElementById('ciPhone').value.trim();
-  if (!phone || phone.replace(/[^0-9]/g, '').length < 9) { showError('נא להזין מספר טלפון תקין'); return; }
+  const cleanP = phone.replace(/[^0-9]/g, '');
+  if (!cleanP.match(/^05\d{8}$/)) { showError('מספר טלפון לא תקין — נדרש מספר ישראלי (05X) עם 10 ספרות'); return; }
 
   // Check duplicate phone locally
   const normalPhone = phone.replace(/[^0-9]/g, '');
@@ -2945,7 +2947,7 @@ function releaseReg(code) {
 }
 
 function approveWaitlist(code) {
-  if (!confirm('לאשר את הממתין/ה ולהעביר לרישום?')) return;
+  if (!confirm('לאשר את הממתין/ה ולשלוח קוד כניסה בוואצאפ?')) return;
   if (apiToken) {
     fetch('/api/events/' + activeEventId + '/waitlist/' + code + '/approve', {
       method: 'POST', headers: { 'x-admin-token': apiToken }
@@ -2955,8 +2957,24 @@ function approveWaitlist(code) {
         if (S.waitlist && S.waitlist[code]) delete S.waitlist[code];
         S.preRegs[code] = data.reg;
         save();
-        showSuccess('הממתין/ה אושר/ה ונרשם/ה בהצלחה!');
+        showSuccess('הממתין/ה אושר/ה! נפתח וואצאפ לשליחת הקוד...');
         renderAll();
+        // Send WhatsApp with code
+        const phone = data.reg.phone || '';
+        const waPhone = formatPhoneForWA(phone);
+        const evTitle = S.eventName ? S.eventName + ' — ' + S.clientName : S.clientName;
+        const slot = S.slots && S.slots[data.reg.slotIndex] ? S.slots[data.reg.slotIndex].label : '';
+        const msg = `שלום ${data.reg.name}! 🎉
+
+מקום התפנה באירוע *${evTitle}*!
+
+קוד הכניסה שלכם: *${code}*
+סבב: ${slot}
+
+נתראה! 🌈`;
+        if (waPhone) {
+          window.open('https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg), '_blank');
+        }
       }
     }).catch(() => showError('שגיאה באישור'));
   } else {

@@ -264,7 +264,8 @@ app.post('/api/events/:id/register', registerLimiter, (req, res) => {
 
   const { name, phone, slotIndex, participants } = req.body;
   if (!name || name.trim().length === 0) return res.status(400).json({ error: 'נא להזין שם' });
-  if (!phone || phone.trim().length < 9) return res.status(400).json({ error: 'נא להזין מספר טלפון' });
+  const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+  if (!cleanPhone.match(/^05\d{8}$/)) return res.status(400).json({ error: 'מספר טלפון לא תקין — נדרש מספר ישראלי (05X) עם 10 ספרות' });
 
   // Check duplicate phone registration
   const normalNewPhone = phone.replace(/[^0-9]/g, '');
@@ -316,7 +317,8 @@ app.post('/api/events/:id/checkin', requireAdmin, (req, res) => {
   if (type === 'walkin') {
     // Walk-in checkin
     if (!name) return res.status(400).json({ error: 'נא להזין שם' });
-    if (!phone || phone.trim().length < 9) return res.status(400).json({ error: 'נא להזין מספר טלפון' });
+    const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+  if (!cleanPhone.match(/^05\d{8}$/)) return res.status(400).json({ error: 'מספר טלפון לא תקין — נדרש מספר ישראלי (05X) עם 10 ספרות' });
 
     // Check if phone already exists in pre-regs or guests
     const normalPhone = phone.replace(/[^0-9]/g, '');
