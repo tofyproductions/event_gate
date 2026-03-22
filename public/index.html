@@ -1593,22 +1593,32 @@ function formatPhoneForWA(phone) {
 
 function buildClientMsg(data, ev, base) {
   const greeting = data.contactName || data.clientName || '';
-  const evTitle = data.eventName || data.clientName || 'אירוע';
-  const date = data.startTime ? new Date(data.startTime).toISOString().split('T')[0] : '';
-  const clientUrl = `${base}?client=${data.clientToken}`;
+  const evTitle = data.eventName ? `${data.eventName} — ${data.clientName}` : (data.clientName || 'אירוע');
+  const date = ev.date || (data.startTime ? new Date(data.startTime).toISOString().split('T')[0] : '');
+  const clientUrl = data.clientToken ? `${base}?client=${data.clientToken}` : '';
   const regUrl = `${base}?event=${ev.id}#register`;
   const slots = data.slots || [];
   const timeRange = slots.length > 0 ? `${slots[0].label.split(' - ')[0]} - ${slots[slots.length - 1].label.split(' - ')[1]}` : '';
+  const address = data.eventAddress || ev.eventAddress || '';
 
-  let msg = `שלום${greeting ? ' ' + greeting : ''}!\n\n`;
-  msg += `פרטי האירוע *${evTitle}*${date ? ' | ' + date : ''}${timeRange ? ' | ' + timeRange : ''}\n\n`;
+  let msg = `שלום${greeting ? ' ' + greeting : ''}! 🌈\n\n`;
+  msg += `📋 *פרטי האירוע:*\n`;
+  msg += `🎪 *${evTitle}*\n`;
+  if (date) msg += `📅 תאריך: ${date}\n`;
+  if (timeRange) msg += `🕐 שעות: ${timeRange}\n`;
+  if (address) msg += `📍 מיקום: ${address}\n`;
+  if (address) msg += `🗺️ ניווט: https://waze.com/ul?q=${encodeURIComponent(address)}\n`;
+  msg += `👥 עד ${data.maxCapacity || 50} משתתפים בסבב\n`;
   if (data.attractions) {
-    const items = data.attractions.split('\n').filter(a => a.trim()).map(a => '- ' + a.trim()).join('\n');
-    msg += `אטרקציות:\n${items}\n\n`;
+    const items = data.attractions.split('\n').filter(a => a.trim()).map(a => '🎯 ' + a.trim()).join('\n');
+    msg += `\n🎉 *אטרקציות:*\n${items}\n`;
   }
-  msg += `קישור צפייה בזמן אמת:\n${clientUrl}\n\n`;
-  msg += `קישור הרשמה מראש למשתתפים:\n${regUrl}\n\n`;
-  msg += `בהצלחה!\n\n--\n*טופי* - הפקות אירועים\nחברים של טופי בע״מ`;
+  msg += `\n━━━━━━━━━━━━━━━━\n`;
+  msg += `\n🔗 *קישורים:*\n`;
+  if (clientUrl) msg += `📊 צפייה בלייב: ${clientUrl}\n`;
+  msg += `📝 הרשמה למשתתפים: ${regUrl}\n`;
+  msg += `\n━━━━━━━━━━━━━━━━\n`;
+  msg += `🌈 *טופי* - הפקות אירועים\nחברים של טופי בע״מ`;
   return msg;
 }
 
@@ -1624,21 +1634,12 @@ function waShareToClient() {
 }
 
 function waQuickClient(eventId) {
-  // Send client viewing link + registration link via WhatsApp to client contact
   const data = loadData(eventId);
   const reg = loadRegistry();
   const ev = reg.find(e => e.id === eventId);
   if (!ev) return;
   const base = window.location.origin + window.location.pathname;
-  const clientUrl = data.clientToken ? base + '?client=' + data.clientToken : '';
-  const regUrl = base + '?event=' + eventId + '#register';
-  const greeting = data.contactName || data.clientName || '';
-  const evTitle = data.eventName || data.clientName || 'אירוע';
-  let msg = 'שלום' + (greeting ? ' ' + greeting : '') + '! \ud83c\udf08\n';
-  msg += '\nהנה הקישורים לאירוע *' + evTitle + '*:\n';
-  if (clientUrl) msg += '\n\ud83d\udcca צפייה בלייב:\n' + clientUrl + '\n';
-  msg += '\n\ud83d\udcdd קישור הרשמה למשתתפים:\n' + regUrl;
-  msg += '\n\n\ud83c\udf08 *טופי* - הפקות אירועים';
+  const msg = buildClientMsg(data, ev, base);
   const waPhone = formatPhoneForWA(data.contactPhone);
   window.open('https://wa.me/' + (waPhone || '') + '?text=' + encodeURIComponent(msg), '_blank');
 }
