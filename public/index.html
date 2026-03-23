@@ -627,7 +627,7 @@
           </div>
           <div style="text-align:center;flex:1;background:var(--bg);border-radius:10px;padding:6px">
             <div id="regEvSpots" style="font-size:1rem;font-weight:700;color:var(--yellow)">0</div>
-            <div style="font-size:.6rem;color:var(--muted)">מקומות פנויים</div>
+            <div style="font-size:.6rem;color:var(--muted)">פנויים (מקס' בסבב)</div>
           </div>
         </div>
       </div>
@@ -2045,8 +2045,17 @@ function renderRegSummary() {
   if (slotCountEl) slotCountEl.textContent = S.numSlots || 0;
   if (durationEl) durationEl.textContent = S.slotDurationMin || 0;
   if (spotsEl) {
-    const totalParticipants = Object.values(S.preRegs).reduce((sum, r) => sum + (r.participants || 1), 0);
-    spotsEl.textContent = Math.max(0, S.maxCapacity - totalParticipants);
+    // Use server slotCounts if available (public view), otherwise count preRegs
+    const sc = S.slotCounts || {};
+    let totalParticipants;
+    if (Object.keys(sc).length > 0) {
+      // Find the slot with the most available spots
+      const maxAvail = (S.slots || []).reduce((best, sl) => Math.max(best, S.maxCapacity - (sc[sl.index] || 0)), 0);
+      spotsEl.textContent = Math.max(0, maxAvail);
+    } else {
+      totalParticipants = Object.values(S.preRegs || {}).reduce((sum, r) => sum + (r.participants || 1), 0);
+      spotsEl.textContent = Math.max(0, S.maxCapacity - totalParticipants);
+    }
   }
 }
 
