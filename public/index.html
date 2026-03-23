@@ -2063,12 +2063,21 @@ function renderRegister() {
   renderRegSummary();
   document.getElementById('regFormSection').style.display = 'block';
 
-  const regs = Object.values(S.preRegs);
-  const waitlist = Object.values(S.waitlist || {}).filter(w => w.status === 'waiting');
-  const allSlotsFull = S.slots.every(slot => {
-    const count = regs.filter(r => r.slotIndex === slot.index).reduce((s, r) => s + (r.participants || 1), 0);
-    return count >= S.maxCapacity;
-  });
+  // Use slotCounts from server API (accurate) OR fall back to counting preRegs locally
+  const serverSlotCounts = S.slotCounts || {};
+  const serverWaitCounts = S.waitlistCounts || {};
+  const regs = Object.values(S.preRegs || {});
+
+  function getSlotCount(slotIndex) {
+    if (serverSlotCounts[slotIndex] !== undefined) return serverSlotCounts[slotIndex];
+    return regs.filter(r => r.slotIndex === slotIndex).reduce((s, r) => s + (r.participants || 1), 0);
+  }
+  function getWaitCount(slotIndex) {
+    if (serverWaitCounts[slotIndex] !== undefined) return serverWaitCounts[slotIndex];
+    return Object.values(S.waitlist || {}).filter(w => w.status === 'waiting' && w.slotIndex === slotIndex).reduce((s, w) => s + (w.participants || 1), 0);
+  }
+
+  const allSlotsFull = S.slots.every(slot => getSlotCount(slot.index) >= S.maxCapacity);
 
   // Show waitlist banner if all slots full
   const wlBanner = document.getElementById('regWaitlistBanner');
@@ -2076,11 +2085,11 @@ function renderRegister() {
 
   const grid = document.getElementById('regSlotGrid');
   grid.innerHTML = S.slots.map(slot => {
-    const count = regs.filter(r => r.slotIndex === slot.index).reduce((s, r) => s + (r.participants || 1), 0);
+    const count = getSlotCount(slot.index);
     const avail = S.maxCapacity - count;
     const full = avail <= 0;
     const pct = count / S.maxCapacity;
-    const slotWaitCount = waitlist.filter(w => w.slotIndex === slot.index).reduce((s, w) => s + (w.participants || 1), 0);
+    const slotWaitCount = getWaitCount(slot.index);
     let cls = 'avail-ok', txt = `${avail} מקומות`;
     if (full) {
       cls = 'avail-full';
@@ -2099,8 +2108,9 @@ function selectRegSlot(i) {
   selectedRegSlot = i;
   renderRegister();
   // Update button text based on slot availability
-  const regs = Object.values(S.preRegs);
-  const count = regs.filter(r => r.slotIndex === i).reduce((s, r) => s + (r.participants || 1), 0);
+  const serverSlotCounts2 = S.slotCounts || {};
+  const count = serverSlotCounts2[i] !== undefined ? serverSlotCounts2[i] :
+    Object.values(S.preRegs || {}).filter(r => r.slotIndex === i).reduce((s, r) => s + (r.participants || 1), 0);
   const full = count >= S.maxCapacity;
   const btn = document.querySelector('#regFormSection .btn-primary.blue');
   if (btn) {
@@ -4159,6 +4169,18 @@ if (urlSelfCheckin) {
           } else {
             document.getElementById('page-register').classList.add('active');
           }
+          // Auto-refresh registration data from server every 5 seconds
+          setInterval(async () => {
+            try {
+              const r2 = await fetch('/api/events/' + urlEventId);
+              if (r2.ok) {
+                const freshData = await r2.json();
+                S.slotCounts = freshData.slotCounts;
+                S.waitlistCounts = freshData.waitlistCounts;
+                renderRegister();
+              }
+            } catch(e) {}
+          }, 5000);
         } else {
           throw new Error('not found');
         }
