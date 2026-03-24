@@ -964,6 +964,289 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
 });
 
 
+// ========== VISUAL HTML REPORT ==========
+app.get('/api/events/:id/report', requireAdmin, (req, res) => {
+  const ev = db.events[req.params.id];
+  if (!ev) return res.status(404).send('אירוע לא נמצא');
+
+  const evTitle = ev.eventName ? `${ev.eventName} — ${ev.clientName}` : ev.clientName;
+  const evDate = ev.startTime ? new Date(ev.startTime).toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  const slots = ev.slots || [];
+  const timeRange = slots.length > 0 ? `${slots[0].label.split(' - ')[0]} - ${slots[slots.length - 1].label.split(' - ')[1]}` : '';
+
+  const preRegs = Object.values(ev.preRegs || {});
+  const guests = Object.values(ev.guests || {});
+  const waitlist = Object.values(ev.waitlist || {}).filter(w => w.status === 'waiting');
+  const walkins = guests.filter(g => g.type === 'walkin');
+
+  const totalRegP = preRegs.reduce((s, r) => s + (r.participants || 1), 0);
+  const arrivedP = preRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
+  const notArrivedP = totalRegP - arrivedP;
+  const walkinP = walkins.reduce((s, g) => s + (g.groupSize || 1), 0);
+  const totalVisited = guests.reduce((s, g) => s + (g.groupSize || 1), 0);
+  const waitlistP = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
+  const arrivalRate = totalRegP > 0 ? Math.round(arrivedP / totalRegP * 100) : 0;
+  const guestsWithDur = guests.filter(g => g.checkoutTime && g.checkinTime);
+  const avgStayMin = guestsWithDur.length > 0 ? Math.round(guestsWithDur.reduce((s, g) => s + (g.checkoutTime - g.checkinTime), 0) / guestsWithDur.length / 60000) : 0;
+
+  // Client cross-event data
+  const clientEvents = Object.values(db.events).filter(e => e.clientName === ev.clientName).sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+
+  // Build slot data
+  const slotData = slots.map((sl, i) => {
+    const sr = preRegs.filter(r => r.slotIndex === i);
+    const sp = sr.reduce((s, r) => s + (r.participants || 1), 0);
+    const sa = sr.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
+    return { label: sl.label, index: i, regs: sr, regP: sp, arrivedP: sa, rate: sp > 0 ? Math.round(sa / sp * 100) : 0 };
+  });
+
+  // Cross-event comparison
+  const ceData = clientEvents.map(ce => {
+    const r = Object.values(ce.preRegs || {}); const g = Object.values(ce.guests || {});
+    const rp = r.reduce((s, x) => s + (x.participants || 1), 0);
+    const ap = r.filter(x => x.arrived).reduce((s, x) => s + (x.participants || 1), 0);
+    const wp = g.filter(x => x.type === 'walkin').reduce((s, x) => s + (x.groupSize || 1), 0);
+    const tp = g.reduce((s, x) => s + (x.groupSize || 1), 0);
+    return { id: ce.id, name: ce.eventName || ce.clientName, date: ce.date, regP: rp, arrivedP: ap, walkinP: wp, totalP: tp, rate: rp > 0 ? Math.round(ap / rp * 100) : 0, isCurrent: ce.id === ev.id };
+  });
+
+  const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const html = `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>דוח אירוע — ${esc(evTitle)}</title>
+<style>
+@page{size:A4;margin:10mm}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.report{max-width:900px;margin:0 auto;padding:24px}
+.no-print{margin:16px auto;max-width:900px;text-align:center;padding:12px}
+.no-print button{padding:12px 32px;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;color:white;margin:0 6px}
+.btn-pdf{background:linear-gradient(135deg,#3b82f6,#2563eb)}
+.btn-wa{background:linear-gradient(135deg,#22c55e,#16a34a)}
+
+/* Header */
+.header{background:linear-gradient(135deg,#1e3a5f,#0f172a);border-radius:20px;padding:28px;margin-bottom:20px;border:1px solid #1e40af;text-align:center;position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#ef4444,#f97316,#eab308,#22c55e,#3b82f6,#a855f7)}
+.header h1{font-size:1.8rem;margin-bottom:6px;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .meta{font-size:.9rem;color:#94a3b8;margin-bottom:4px}
+.header .meta b{color:#60a5fa}
+
+/* KPI Cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.kpi{background:#1e293b;border-radius:16px;padding:20px 12px;text-align:center;border:1px solid #334155;position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px}
+.kpi.blue::after{background:#3b82f6}.kpi.green::after{background:#22c55e}.kpi.red::after{background:#ef4444}
+.kpi.orange::after{background:#f97316}.kpi.purple::after{background:#a855f7}.kpi.yellow::after{background:#eab308}
+.kpi-val{font-size:2.4rem;font-weight:900;line-height:1.1}
+.kpi-label{font-size:.75rem;color:#94a3b8;margin-top:4px}
+.kpi.blue .kpi-val{color:#60a5fa}.kpi.green .kpi-val{color:#4ade80}.kpi.red .kpi-val{color:#f87171}
+.kpi.orange .kpi-val{color:#fb923c}.kpi.purple .kpi-val{color:#c084fc}.kpi.yellow .kpi-val{color:#facc15}
+
+/* Sections */
+.section{background:#1e293b;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #334155}
+.section-title{font-size:1.1rem;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:2px solid #334155}
+
+/* Slot bars */
+.slot-bar{margin-bottom:10px;background:#0f172a;border-radius:10px;padding:12px;border:1px solid #334155}
+.slot-header{display:flex;justify-content:space-between;margin-bottom:6px;font-size:.85rem}
+.slot-fill{height:8px;border-radius:4px;transition:width .5s}
+.slot-stats{display:flex;gap:16px;margin-top:6px;font-size:.75rem;color:#94a3b8}
+.slot-stats b{color:#e2e8f0}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:.8rem;margin-top:10px}
+th{background:#334155;color:#e2e8f0;padding:10px 8px;text-align:right;font-weight:700;font-size:.75rem}
+td{padding:8px;border-bottom:1px solid #1e293b}
+tr.arrived{background:rgba(34,197,94,.08)}
+tr.arrived td:last-child{color:#4ade80;font-weight:700}
+tr.notarrived{background:rgba(239,68,68,.05)}
+tr.notarrived td:last-child{color:#f87171;font-weight:700}
+tr.walkin{background:rgba(249,115,22,.06)}
+tr.waitlist{background:rgba(234,179,8,.06)}
+
+/* Chart bars */
+.chart-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.chart-label{width:120px;text-align:left;font-size:.75rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-fill{height:24px;border-radius:6px;min-width:2px;position:relative;display:flex;align-items:center;justify-content:flex-end;padding:0 8px}
+.chart-fill span{font-size:.7rem;font-weight:700;color:white}
+.chart-track{flex:1;background:#0f172a;border-radius:6px;height:24px;overflow:hidden}
+
+/* Insights */
+.insight{padding:10px 14px;border-radius:10px;margin-bottom:8px;font-size:.85rem;display:flex;align-items:center;gap:8px}
+.insight.good{background:rgba(34,197,94,.1);border-left:3px solid #22c55e}
+.insight.warn{background:rgba(234,179,8,.1);border-left:3px solid #eab308}
+.insight.bad{background:rgba(239,68,68,.1);border-left:3px solid #ef4444}
+.insight.info{background:rgba(59,130,246,.1);border-left:3px solid #3b82f6}
+
+/* Footer */
+.footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:1px solid #334155;margin-top:20px}
+.footer .brand{font-size:.9rem;color:#60a5fa;font-weight:700}
+
+@media print{
+  body{background:white;color:#1e293b}
+  .no-print{display:none}
+  .report{padding:0}
+  .header{background:linear-gradient(135deg,#eff6ff,#f0f9ff);border-color:#bfdbfe}
+  .header h1{-webkit-text-fill-color:#1e40af}
+  .section,.kpi{background:#f8fafc;border-color:#e2e8f0}
+  th{background:#e2e8f0;color:#1e293b}
+  td{border-color:#e2e8f0}
+  .slot-bar{background:#f1f5f9;border-color:#e2e8f0}
+}
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button class="btn-pdf" onclick="window.print()">🖨️ הדפס / שמור PDF</button>
+  <button class="btn-wa" onclick="shareReport()">📲 שלח בוואצאפ</button>
+</div>
+
+<div class="report">
+
+<!-- HEADER -->
+<div class="header">
+  <div style="font-size:.8rem;color:#94a3b8;margin-bottom:4px">דוח אירוע מפורט</div>
+  <h1>🌈 ${esc(evTitle)}</h1>
+  <div class="meta">📅 <b>${evDate}</b> &nbsp;|&nbsp; 🕐 <b>${timeRange}</b></div>
+  <div class="meta">👤 ${esc(ev.contactName || '-')} &nbsp;|&nbsp; 📞 ${esc(ev.contactPhone || '-')} &nbsp;|&nbsp; 📍 ${esc(ev.eventAddress || '-')}</div>
+  ${ev.attractions ? `<div class="meta" style="margin-top:6px">🎪 ${esc(ev.attractions).replace(/\n/g, ' • ')}</div>` : ''}
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-grid">
+  <div class="kpi blue"><div class="kpi-val">${totalRegP}</div><div class="kpi-label">נרשמו מראש</div></div>
+  <div class="kpi green"><div class="kpi-val">${arrivedP}</div><div class="kpi-label">הגיעו בפועל</div></div>
+  <div class="kpi ${arrivalRate >= 50 ? 'green' : arrivalRate >= 30 ? 'yellow' : 'red'}"><div class="kpi-val">${arrivalRate}%</div><div class="kpi-label">אחוז הגעה</div></div>
+</div>
+<div class="kpi-grid">
+  <div class="kpi red"><div class="kpi-val">${notArrivedP}</div><div class="kpi-label">לא הגיעו</div></div>
+  <div class="kpi orange"><div class="kpi-val">${walkinP}</div><div class="kpi-label">מזדמנים</div></div>
+  <div class="kpi purple"><div class="kpi-val">${totalVisited}</div><div class="kpi-label">סה"כ ביקרו</div></div>
+</div>
+<div class="kpi-grid" style="grid-template-columns:repeat(2,1fr)">
+  <div class="kpi blue"><div class="kpi-val">${avgStayMin > 0 ? avgStayMin + ' דק\'' : '-'}</div><div class="kpi-label">שהייה ממוצעת</div></div>
+  <div class="kpi yellow"><div class="kpi-val">${waitlistP}</div><div class="kpi-label">רשימת המתנה</div></div>
+</div>
+
+<!-- SLOT BREAKDOWN -->
+<div class="section">
+  <div class="section-title">📊 פירוט סבבים</div>
+  ${slotData.map((sd, i) => {
+    const pct = Math.round(sd.regP / ev.maxCapacity * 100);
+    const fillColor = pct >= 90 ? '#ef4444' : pct >= 60 ? '#eab308' : '#22c55e';
+    const ratePct = sd.rate;
+    const rateColor = ratePct >= 50 ? '#4ade80' : ratePct >= 30 ? '#facc15' : '#f87171';
+    return `<div class="slot-bar">
+      <div class="slot-header"><span style="font-weight:700">סבב ${i + 1}: ${sd.label}</span><span style="color:${fillColor};font-weight:700">${sd.regP}/${ev.maxCapacity}</span></div>
+      <div style="height:8px;background:#1e293b;border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${fillColor};border-radius:4px"></div></div>
+      <div class="slot-stats"><span>📋 נרשמו: <b>${sd.regP}</b></span><span>✅ הגיעו: <b style="color:${rateColor}">${sd.arrivedP}</b></span><span>❌ לא הגיעו: <b>${sd.regP - sd.arrivedP}</b></span><span>📈 הגעה: <b style="color:${rateColor}">${ratePct}%</b></span></div>
+    </div>`;
+  }).join('')}
+</div>
+
+<!-- REGISTRATIONS TABLE -->
+<div class="section">
+  <div class="section-title">📋 רשימת נרשמים מראש (${totalRegP} משתתפים)</div>
+  ${slotData.map((sd, i) => `
+    <div style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:.9rem;margin-bottom:6px;color:#60a5fa">סבב ${i + 1}: ${sd.label} (${sd.regP} משתתפים)</div>
+      <table><tr><th>#</th><th>שם</th><th>טלפון</th><th>משתתפים</th><th>תאריך רישום</th><th>סטטוס</th></tr>
+      ${[...sd.regs.filter(r => r.arrived), ...sd.regs.filter(r => !r.arrived)].map((r, idx) => {
+        const regDate = r.registeredAt ? new Date(r.registeredAt).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        return `<tr class="${r.arrived ? 'arrived' : 'notarrived'}"><td>${idx + 1}</td><td>${esc(r.name)}</td><td dir="ltr">${esc(r.phone || '')}</td><td>${r.participants || 1}</td><td>${regDate}</td><td>${r.arrived ? '✅ הגיע/ה' : '❌ לא הגיע/ה'}</td></tr>`;
+      }).join('')}
+      ${sd.regs.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:#94a3b8">אין נרשמים</td></tr>' : ''}
+      </table>
+    </div>
+  `).join('')}
+</div>
+
+<!-- WALK-INS -->
+<div class="section">
+  <div class="section-title">🚶 אורחים מזדמנים (${walkinP} משתתפים)</div>
+  <table><tr><th>#</th><th>שם</th><th>טלפון</th><th>משתתפים</th><th>כניסה</th><th>יציאה</th><th>משך</th></tr>
+  ${walkins.sort((a, b) => a.checkinTime - b.checkinTime).map((g, idx) => {
+    const dur = g.checkoutTime ? Math.round((g.checkoutTime - g.checkinTime) / 60000) + ' דק\'' : '-';
+    return `<tr class="walkin"><td>${idx + 1}</td><td>${esc(g.name)}</td><td dir="ltr">${esc(g.phone || '')}</td><td>${g.groupSize || 1}</td><td>${formatHM(g.checkinTime)}</td><td>${g.checkoutTime ? formatHM(g.checkoutTime) : '-'}</td><td>${dur}</td></tr>`;
+  }).join('')}
+  ${walkins.length === 0 ? '<tr><td colspan="7" style="text-align:center;color:#94a3b8">אין מזדמנים</td></tr>' : ''}
+  </table>
+</div>
+
+<!-- WAITLIST -->
+${waitlist.length > 0 ? `
+<div class="section">
+  <div class="section-title">⏳ רשימת המתנה (${waitlistP} משתתפים)</div>
+  <table><tr><th>#</th><th>שם</th><th>טלפון</th><th>סבב</th><th>משתתפים</th></tr>
+  ${waitlist.sort((a, b) => (a.registeredAt || 0) - (b.registeredAt || 0)).map((w, idx) =>
+    `<tr class="waitlist"><td>${idx + 1}</td><td>${esc(w.name)}</td><td dir="ltr">${esc(w.phone || '')}</td><td>סבב ${(w.slotIndex || 0) + 1}</td><td>${w.participants || 1}</td></tr>`
+  ).join('')}
+  </table>
+</div>` : ''}
+
+<!-- CROSS-EVENT COMPARISON -->
+${clientEvents.length > 1 ? `
+<div class="section">
+  <div class="section-title">📊 השוואת אירועים — ${esc(ev.clientName)}</div>
+
+  <!-- Bar chart -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:#94a3b8">סה"כ מבקרים לפי אירוע</div>
+    ${ceData.map(ce => {
+      const maxP = Math.max(...ceData.map(x => x.totalP), 1);
+      const pct = Math.round(ce.totalP / maxP * 100);
+      return `<div class="chart-bar">
+        <div class="chart-label">${esc(ce.name)}</div>
+        <div class="chart-track"><div class="chart-fill" style="width:${pct}%;background:${ce.isCurrent ? '#3b82f6' : '#475569'}"><span>${ce.totalP}</span></div></div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <!-- Comparison table -->
+  <table><tr><th>#</th><th>אירוע</th><th>תאריך</th><th>נרשמו</th><th>הגיעו</th><th>מזדמנים</th><th>סה"כ</th><th>% הגעה</th></tr>
+  ${ceData.map((ce, idx) => {
+    const rateColor = ce.rate >= 50 ? '#4ade80' : ce.rate >= 30 ? '#facc15' : '#f87171';
+    return `<tr style="${ce.isCurrent ? 'background:rgba(59,130,246,.15)' : ''}"><td>${idx + 1}</td><td style="${ce.isCurrent ? 'font-weight:700;color:#60a5fa' : ''}">${esc(ce.name)}</td><td>${ce.date}</td><td>${ce.regP}</td><td>${ce.arrivedP}</td><td>${ce.walkinP}</td><td style="font-weight:700">${ce.totalP}</td><td style="color:${rateColor};font-weight:700">${ce.rate}%</td></tr>`;
+  }).join('')}
+  </table>
+</div>` : ''}
+
+<!-- INSIGHTS -->
+<div class="section">
+  <div class="section-title">💡 תובנות</div>
+  ${arrivalRate >= 50 ? '<div class="insight good">✅ אחוז הגעה טוב — המשיכו כך!</div>' : arrivalRate >= 30 ? '<div class="insight warn">⚠️ אחוז הגעה בינוני — שקלו לשלוח תזכורות לנרשמים</div>' : '<div class="insight bad">🔴 אחוז הגעה נמוך — מומלץ לשלוח תזכורות SMS/WhatsApp יום לפני</div>'}
+  <div class="insight info">👥 ממוצע מבקרים: ${totalVisited} משתתפים</div>
+  ${walkinP > 0 ? `<div class="insight info">🚶 ${Math.round(walkinP / Math.max(totalVisited, 1) * 100)}% מהמבקרים מזדמנים — ${walkinP > totalVisited * 0.3 ? 'פוטנציאל לרישום מוקדם גבוה יותר' : 'רוב המבקרים נרשמים מראש'}</div>` : ''}
+  ${waitlistP > 0 ? `<div class="insight warn">⏳ ${waitlistP} אנשים ברשימת המתנה — שקלו להגדיל תפוסה או להוסיף סבבים</div>` : ''}
+  ${avgStayMin > 0 ? `<div class="insight info">⏱️ שהייה ממוצעת: ${avgStayMin} דקות${avgStayMin < 15 ? ' — קצר, אולי כדאי להעשיר את התוכן' : ''}</div>` : ''}
+  ${clientEvents.length > 1 ? `<div class="insight info">📊 ${clientEvents.length} אירועים ללקוח — ממוצע הגעה כללי: ${Math.round(ceData.reduce((s, c) => s + c.arrivedP, 0) / Math.max(ceData.reduce((s, c) => s + c.regP, 0), 1) * 100)}%</div>` : ''}
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="brand">🌈 חברים של טופי בע"מ — ניהול זרימת קהל</div>
+  <div>הופק ב: ${new Date().toLocaleString('he-IL')}</div>
+</div>
+
+</div>
+
+<script>
+function shareReport() {
+  const url = window.location.href;
+  const msg = 'דוח אירוע: ${esc(evTitle)}\\n${evDate} | ${timeRange}\\n\\nצפייה בדוח:\\n' + url + '\\n\\n🌈 חברים של טופי בע"מ';
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+</script>
+</body></html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
