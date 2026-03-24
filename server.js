@@ -595,7 +595,7 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
     const r2 = ws.addRow(['', text]);
     r2.height = 32;
     r2.getCell(2).font = { bold: true, size: 14, color: C.white };
-    for (let i = 1; i <= ws.columnCount; i++) {
+    for (let i = 1; i <= 11; i++) {
       r2.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: color };
       r2.getCell(i).border = border(color.argb);
     }
@@ -624,7 +624,7 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
     r.getCell(5).font = { bold: true, size: 16, color: color };
     r.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
     if (bgColor) {
-      for (let i = 1; i <= ws.columnCount; i++) {
+      for (let i = 1; i <= 7; i++) {
         r.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: bgColor };
         r.getCell(i).border = border();
       }
@@ -952,10 +952,15 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
   footerRow.getCell(2).font = { size: 10, color: C.brand, bold: true };
 
   // Send file
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename=report_${ev.eventName || ev.clientName}_${ev.date || ''}.xlsx`);
-  await wb.xlsx.write(res);
-  res.end();
+  try {
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=report_${ev.eventName || ev.clientName}_${ev.date || ''}.xlsx`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('XLSX export error:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'שגיאה ביצוא הדוח: ' + err.message });
+  }
 });
 
 
