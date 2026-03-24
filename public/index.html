@@ -244,6 +244,7 @@
     .status-danger{background:rgba(249,115,22,.1);color:var(--orange)}
     .status-full{background:rgba(239,68,68,.12);color:var(--red);animation:pulse 1.5s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+    @keyframes scanLine{0%,100%{top:20%}50%{top:80%}}
 
     .stats-row{display:flex;gap:8px;margin-bottom:12px}
     .stat-card{flex:1;background:var(--card);border-radius:10px;padding:10px;text-align:center}
@@ -784,14 +785,26 @@
       </div>
     </div>
 
-    <!-- QR code for self-checkin -->
+    <!-- QR code display + Scanner -->
     <div class="checkin-panel" id="panel-qr">
+      <!-- QR Display for guests -->
       <div class="card" style="text-align:center;padding:20px">
-        <div style="font-size:.95rem;font-weight:700;margin-bottom:4px">כניסה מהירה בסריקת QR</div>
+        <div style="font-size:.95rem;font-weight:700;margin-bottom:4px">QR להצגה למשתתפים</div>
         <div style="font-size:.8rem;color:var(--muted);margin-bottom:14px">הציגו את הקוד למשתתפים לסריקה מהטלפון</div>
         <div id="qrCodeImg" style="margin:0 auto 12px;background:white;border-radius:14px;padding:12px;display:inline-block"></div>
         <div style="font-size:.7rem;color:var(--muted);margin-bottom:8px;direction:ltr;word-break:break-all" id="qrUrl"></div>
         <button class="btn-sm blue" onclick="copyQrLink()" style="padding:8px 16px;font-size:.85rem">&#128279; העתק קישור</button>
+      </div>
+      <!-- Barcode/QR Scanner -->
+      <div class="card" style="text-align:center;padding:20px;margin-top:12px">
+        <div style="font-size:.95rem;font-weight:700;margin-bottom:4px">&#128247; סריקת קוד כניסה</div>
+        <div style="font-size:.8rem;color:var(--muted);margin-bottom:14px">סרקו את הקוד של המשתתף לכניסה מהירה</div>
+        <div id="scannerContainer" style="display:none;position:relative;max-width:300px;margin:0 auto 12px;border-radius:14px;overflow:hidden;border:3px solid var(--green)">
+          <video id="scannerVideo" style="width:100%;border-radius:12px" autoplay playsinline></video>
+          <div style="position:absolute;top:50%;left:10%;right:10%;height:2px;background:var(--green);opacity:.7;animation:scanLine 2s ease-in-out infinite"></div>
+        </div>
+        <div id="scanResult" style="display:none;margin-bottom:12px;padding:12px;border-radius:10px;font-weight:700"></div>
+        <button id="scanStartBtn" class="btn-primary green" onclick="toggleScanner()" style="padding:14px;font-size:1rem">&#128247; התחל סריקה</button>
       </div>
     </div>
 
@@ -2545,6 +2558,128 @@ function updateQrCode() {
 function copyQrLink() {
   const url = document.getElementById('qrUrl').textContent;
   if (url) navigator.clipboard.writeText(url).then(() => showSuccess('קישור סריקה הועתק!'));
+}
+
+// ===== QR/Barcode Scanner =====
+let scannerStream = null;
+let scannerInterval = null;
+
+function toggleScanner() {
+  const container = document.getElementById('scannerContainer');
+  const btn = document.getElementById('scanStartBtn');
+  if (scannerStream) {
+    stopScanner();
+  } else {
+    startScanner();
+  }
+}
+
+async function startScanner() {
+  const container = document.getElementById('scannerContainer');
+  const video = document.getElementById('scannerVideo');
+  const btn = document.getElementById('scanStartBtn');
+  const result = document.getElementById('scanResult');
+  result.style.display = 'none';
+
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+    });
+    video.srcObject = scannerStream;
+    container.style.display = 'block';
+    btn.textContent = '⏹ עצור סריקה';
+    btn.className = 'btn-primary red';
+
+    // Use BarcodeDetector if available, otherwise canvas-based
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13'] });
+      scannerInterval = setInterval(async () => {
+        try {
+          const codes = await detector.detect(video);
+          if (codes.length > 0) {
+            handleScannedCode(codes[0].rawValue);
+          }
+        } catch(e) {}
+      }, 300);
+    } else {
+      // Fallback: manual code entry prompt
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      scannerInterval = setInterval(() => {
+        // Visual feedback - camera is working
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+      }, 500);
+      // Show a note about manual entry
+      result.style.display = 'block';
+      result.style.background = 'rgba(59,130,246,.15)';
+      result.style.color = 'var(--blue)';
+      result.innerHTML = '📱 המצלמה פועלת.<br>אם הסריקה לא מזהה — הזינו את הקוד ידנית בטאב "רשום מראש"';
+    }
+  } catch(e) {
+    showError('לא ניתן לפתוח מצלמה — בדקו הרשאות');
+    console.error('Camera error:', e);
+  }
+}
+
+function stopScanner() {
+  const container = document.getElementById('scannerContainer');
+  const btn = document.getElementById('scanStartBtn');
+  if (scannerStream) {
+    scannerStream.getTracks().forEach(t => t.stop());
+    scannerStream = null;
+  }
+  if (scannerInterval) {
+    clearInterval(scannerInterval);
+    scannerInterval = null;
+  }
+  container.style.display = 'none';
+  btn.textContent = '📷 התחל סריקה';
+  btn.className = 'btn-primary green';
+}
+
+function handleScannedCode(code) {
+  if (!code) return;
+  stopScanner();
+
+  const result = document.getElementById('scanResult');
+  result.style.display = 'block';
+
+  // Try to find this code in preRegs
+  const cleanCode = code.toUpperCase().trim();
+  const reg = S.preRegs[cleanCode];
+
+  if (reg) {
+    if (reg.arrived) {
+      result.style.background = 'rgba(234,179,8,.15)';
+      result.style.color = 'var(--yellow)';
+      result.textContent = `⚠️ ${reg.name} — כבר נכנס/ה לאירוע`;
+    } else {
+      // Auto check-in
+      result.style.background = 'rgba(34,197,94,.15)';
+      result.style.color = 'var(--green)';
+      result.textContent = `✅ ${reg.name} (${reg.participants || 1} משתתפים) — נכנס/ה בהצלחה!`;
+      // Perform checkin
+      document.getElementById('ciCode').value = cleanCode;
+      doCodeCheckin();
+    }
+  } else {
+    // Check if it's a URL with event ID (walk-in QR)
+    const urlMatch = code.match(/[?&]event=([a-f0-9]+)/);
+    if (urlMatch) {
+      result.style.background = 'rgba(59,130,246,.15)';
+      result.style.color = 'var(--blue)';
+      result.textContent = '📋 קישור הרשמה — העברו את המזדמן לטאב "מזדמן"';
+    } else {
+      result.style.background = 'rgba(239,68,68,.15)';
+      result.style.color = 'var(--red)';
+      result.textContent = `❌ קוד לא מזוהה: ${cleanCode}`;
+    }
+  }
+
+  // Auto-hide result after 5 seconds
+  setTimeout(() => { result.style.display = 'none'; }, 5000);
 }
 
 function populateCheckinEventSelector() {
