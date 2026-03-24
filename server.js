@@ -603,15 +603,22 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
   const waitlistP = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
   const arrivalRate = totalRegP > 0 ? Math.round(arrivedP / totalRegP * 100) : 0;
 
+  // Average stay calculation
+  const guestsWithDuration = guests.filter(g => g.checkoutTime && g.checkinTime);
+  const avgStayMin = guestsWithDuration.length > 0 ? Math.round(guestsWithDuration.reduce((s, g) => s + (g.checkoutTime - g.checkinTime), 0) / guestsWithDuration.length / 60000) : 0;
+  const avgStayStr = avgStayMin > 0 ? `${avgStayMin} דקות` : '-';
+
   const stats = [
     ['נרשמו מראש (משתתפים)', totalRegP],
     ['הגיעו מרישום מוקדם', arrivedP],
     ['לא הגיעו', notArrivedP],
     ['אחוז הגעה', `${arrivalRate}%`],
     ['אורחים מזדמנים', walkinP],
-    ['סה"כ ביקרו', totalVisited],
-    ['נוכחים כרגע', activeP],
+    ['סה"כ ביקרו באירוע', totalVisited],
+    ['שהייה ממוצעת', avgStayStr],
     ['ברשימת המתנה', waitlistP],
+    ['מקסימום בו-זמנית', ev.maxCapacity],
+    ['סבבים', `${slots.length} x ${ev.slotDurationMin || 30} דק'`],
   ];
 
   ws1.addRow([]);
@@ -639,7 +646,9 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
     const slotArrived = slotRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
 
     // Slot header
-    const slotRow = ws2.addRow(['', `סבב ${i + 1}: ${sl.label}`, '', `${slotP}/${ev.maxCapacity}`, `${slotArrived} הגיעו`]);
+    const slotNotArrived = slotP - slotArrived;
+    const slotRate = slotP > 0 ? Math.round(slotArrived / slotP * 100) : 0;
+    const slotRow = ws2.addRow(['', `סבב ${i + 1}: ${sl.label}`, `נרשמו: ${slotP}/${ev.maxCapacity}`, `הגיעו: ${slotArrived}`, `לא הגיעו: ${slotNotArrived}`, `${slotRate}% הגעה`]);
     slotRow.eachCell((c) => {
       c.font = { bold: true, size: 12, color: white };
       c.fill = { type: 'pattern', pattern: 'solid', fgColor: blue };
@@ -659,6 +668,12 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
         const status = r.arrived ? '✓ הגיע/ה' : '✗ לא הגיע/ה';
         const row = ws2.addRow([idx + 1, r.name, r.phone || '', r.participants || 1, regDate, status]);
         row.getCell(6).font = { color: r.arrived ? green : red, bold: true };
+        // Color entire row background for arrived/not
+        if (r.arrived) {
+          for (let ci = 1; ci <= 6; ci++) row.getCell(ci).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+        } else {
+          for (let ci = 1; ci <= 6; ci++) row.getCell(ci).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4EC' } };
+        }
       });
     }
     ws2.addRow([]); // spacer
@@ -709,12 +724,12 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
   const clientEvents = Object.values(db.events).filter(e => e.clientName === ev.clientName).sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
   if (clientEvents.length > 1) {
     const ws5 = wb.addWorksheet('תובנות לקוח', { views: [{ rightToLeft: true }] });
-    ws5.columns = [{ width: 5 }, { width: 25 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }];
+    ws5.columns = [{ width: 5 }, { width: 25 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }];
 
     const insTitle = ws5.addRow(['', `תובנות — ${ev.clientName}`]);
     insTitle.getCell(2).font = { bold: true, size: 14, color: blue };
 
-    const insHeader = ws5.addRow(['#', 'אירוע', 'תאריך', 'נרשמו', 'הגיעו', 'מזדמנים', 'סה"כ', 'אחוז הגעה']);
+    const insHeader = ws5.addRow(['#', 'אירוע', 'תאריך', 'נרשמו', 'הגיעו', 'לא הגיעו', 'מזדמנים', 'סה"כ ביקרו', 'אחוז הגעה', 'המתנה']);
     insHeader.eachCell((c) => Object.assign(c, headerStyle));
 
     clientEvents.forEach((ce, idx) => {
@@ -724,10 +739,47 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
       const ceArrivedP = ceRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
       const ceWalkinP = ceGuests.filter(g => g.type === 'walkin').reduce((s, g) => s + (g.groupSize || 1), 0);
       const ceTotal = ceGuests.reduce((s, g) => s + (g.groupSize || 1), 0);
+      const ceNotArrived = ceRegP - ceArrivedP;
+      const ceWaitlistP = Object.values(ce.waitlist || {}).filter(w => w.status === 'waiting').reduce((s, w) => s + (w.participants || 1), 0);
       const ceRate = ceRegP > 0 ? `${Math.round(ceArrivedP / ceRegP * 100)}%` : '-';
 
-      const row = ws5.addRow([idx + 1, ce.eventName || ce.clientName, ce.date || '', ceRegP, ceArrivedP, ceWalkinP, ceTotal, ceRate]);
+      const row = ws5.addRow([idx + 1, ce.eventName || ce.clientName, ce.date || '', ceRegP, ceArrivedP, ceNotArrived, ceWalkinP, ceTotal, ceRate, ceWaitlistP]);
       if (ce.id === ev.id) row.eachCell(c => { c.font = { ...c.font, bold: true, color: green }; });
+      // Color rate column
+      const rateVal = ceRegP > 0 ? Math.round(ceArrivedP / ceRegP * 100) : 0;
+      row.getCell(9).font = { bold: true, color: rateVal >= 50 ? green : rateVal >= 30 ? yellow : red };
+    });
+
+    // Totals row
+    ws5.addRow([]);
+    const allRegs = clientEvents.reduce((s, ce) => s + Object.values(ce.preRegs || {}).reduce((ss, r) => ss + (r.participants || 1), 0), 0);
+    const allArrived = clientEvents.reduce((s, ce) => s + Object.values(ce.preRegs || {}).filter(r => r.arrived).reduce((ss, r) => ss + (r.participants || 1), 0), 0);
+    const allNotArrived = allRegs - allArrived;
+    const allWalkins = clientEvents.reduce((s, ce) => s + Object.values(ce.guests || {}).filter(g => g.type === 'walkin').reduce((ss, g) => ss + (g.groupSize || 1), 0), 0);
+    const allTotal = clientEvents.reduce((s, ce) => s + Object.values(ce.guests || {}).reduce((ss, g) => ss + (g.groupSize || 1), 0), 0);
+    const allRate = allRegs > 0 ? `${Math.round(allArrived / allRegs * 100)}%` : '-';
+    const totRow = ws5.addRow(['', `סה"כ ${clientEvents.length} אירועים`, '', allRegs, allArrived, allNotArrived, allWalkins, allTotal, allRate, '']);
+    totRow.eachCell(c => { c.font = { bold: true, size: 12, color: blue }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' } }; });
+
+    // Insights text
+    ws5.addRow([]);
+    ws5.addRow([]);
+    const insightTitle = ws5.addRow(['', '📊 תובנות']);
+    insightTitle.getCell(2).font = { bold: true, size: 14, color: blue };
+
+    const avgRate = allRegs > 0 ? Math.round(allArrived / allRegs * 100) : 0;
+    const avgVisitors = clientEvents.length > 0 ? Math.round(allTotal / clientEvents.length) : 0;
+    const insights = [
+      `ממוצע הגעה: ${avgRate}% מתוך הנרשמים מגיעים בפועל`,
+      avgRate < 50 ? '⚠️ אחוז ההגעה נמוך — מומלץ לשלוח תזכורות לנרשמים יום לפני האירוע' : '✅ אחוז הגעה טוב',
+      `ממוצע מבקרים: ${avgVisitors} משתתפים לאירוע`,
+      allWalkins > 0 ? `${Math.round(allWalkins / allTotal * 100)}% מהמבקרים הם מזדמנים — יש פוטנציאל לרישום מוקדם גבוה יותר` : '',
+      clientEvents.length >= 3 ? `מגמה: ${clientEvents.length} אירועים — ניתן לזהות דפוסים` : '',
+    ].filter(Boolean);
+
+    insights.forEach(t => {
+      const r = ws5.addRow(['', t]);
+      r.getCell(2).font = { size: 11 };
     });
   }
 
