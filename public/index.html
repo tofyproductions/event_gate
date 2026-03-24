@@ -2353,7 +2353,9 @@ function doWalkinCheckin() {
     return slot && now < slot.endTime;
   }).length;
 
-  if (ac + walkinGroup > S.maxCapacity) { showError('האירוע מלא, יש להמתין ליציאת אורחים'); return; }
+  if (ac + walkinGroup > S.maxCapacity) {
+    if (!confirm(`שים לב: יש כרגע ${ac} נוכחים מתוך ${S.maxCapacity} מותרים.\nהוספת ${walkinGroup} אורחים תחרוג מהמגבלה.\n\nלאשר כניסה בחריגה?`)) return;
+  }
 
   const id = randomId();
   const currentSlot = S.slots.find(s => now >= s.startTime && now < s.endTime);
@@ -2361,7 +2363,8 @@ function doWalkinCheckin() {
   save();
   // Sync walk-in to server
   if (apiToken) {
-    fetch('/api/events/' + activeEventId + '/checkin', {
+    const override = ac + walkinGroup > S.maxCapacity ? '?override=1' : '';
+    fetch('/api/events/' + activeEventId + '/checkin' + override, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
       body: JSON.stringify({ name: name.slice(0, 100), phone: phone.slice(0, 20), groupSize: walkinGroup, type: 'walkin' })
     }).catch(() => {});

@@ -333,7 +333,10 @@ app.post('/api/events/:id/checkin', requireAdmin, (req, res) => {
 
     const gs = Math.max(1, Math.min(20, parseInt(groupSize) || 1));
     const ac = activeCount(ev);
-    if (ac + gs > ev.maxCapacity) return res.status(400).json({ error: 'האירוע מלא' });
+    // Admin can override capacity for walk-ins (not all pre-registered will show up)
+    if (ac + gs > ev.maxCapacity && !req.query.override) {
+      return res.status(400).json({ error: 'האירוע מלא', currentCount: ac, max: ev.maxCapacity, canOverride: true });
+    }
 
     const id = randomId();
     ev.guests[id] = {
