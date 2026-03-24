@@ -171,7 +171,9 @@ app.get('/api/events/:id', (req, res) => {
     slots: ev.slots, numSlots: ev.numSlots, maxCapacity: ev.maxCapacity,
     slotDurationMin: ev.slotDurationMin,
     attractions: ev.attractions, eventAddress: ev.eventAddress,
-    date: ev.date, slotCounts,
+    date: ev.date,
+    ended: (ev.slots && ev.slots.length > 0) ? Date.now() > ev.slots[ev.slots.length - 1].endTime : false,
+    slotCounts,
     waitlistCounts: (() => {
       const wc = {};
       (ev.slots || []).forEach(s => { wc[s.index] = 0; });
@@ -269,6 +271,15 @@ app.delete('/api/events/:id', requireAdmin, (req, res) => {
 app.post('/api/events/:id/register', registerLimiter, (req, res) => {
   const ev = db.events[req.params.id];
   if (!ev || !ev.configured) return res.status(404).json({ error: 'אירוע לא נמצא' });
+
+  // Check if event has ended — block registration after last slot ends
+  const slots = ev.slots || [];
+  if (slots.length > 0) {
+    const lastSlotEnd = slots[slots.length - 1].endTime;
+    if (Date.now() > lastSlotEnd) {
+      return res.status(400).json({ error: 'הרישום לאירוע זה נסגר — האירוע הסתיים' });
+    }
+  }
 
   const { name, phone, slotIndex, participants } = req.body;
   if (!name || name.trim().length === 0) return res.status(400).json({ error: 'נא להזין שם' });
