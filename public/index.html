@@ -2267,7 +2267,7 @@ function updateCiTimer() {
 
 function doCodeCheckin() {
   if (!S.configured) { showError('האירוע טרם הוגדר'); return; }
-  if (S.startTime && Date.now() < S.startTime) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
+  if (S.startTime && Date.now() < S.startTime - 30 * 60000) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
   const input = document.getElementById('ciCode').value.trim();
   if (!input) { showError('נא להזין קוד או מספר טלפון'); return; }
 
@@ -2328,7 +2328,7 @@ function doCodeCheckin() {
 function doWalkinCheckin() {
   if (!document.getElementById('walkinTerms').checked) { showError('יש לאשר את תקנון הפעילות'); return; }
   if (!S.configured) { showError('האירוע טרם הוגדר'); return; }
-  if (S.startTime && Date.now() < S.startTime) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
+  if (S.startTime && Date.now() < S.startTime - 30 * 60000) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
   const name = document.getElementById('ciName').value.trim();
   if (!name) { showError('נא להזין שם'); return; }
   const phone = document.getElementById('ciPhone').value.trim();
@@ -2353,8 +2353,7 @@ function doWalkinCheckin() {
     return slot && now < slot.endTime;
   }).length;
 
-  if (ac >= S.maxCapacity) { showError('האירוע מלא, יש להמתין ליציאת אורחים'); return; }
-  if (S.maxCapacity - ac - pendingRegs <= 0) { showError('המקומות שמורים לנרשמים מראש'); return; }
+  if (ac + walkinGroup > S.maxCapacity) { showError('האירוע מלא, יש להמתין ליציאת אורחים'); return; }
 
   const id = randomId();
   const currentSlot = S.slots.find(s => now >= s.startTime && now < s.endTime);
@@ -2935,7 +2934,7 @@ function editGroupSize(guestId) {
 function adminCheckin(code) {
   const r = S.preRegs[code];
   if (!r || r.arrived) return;
-  if (S.startTime && Date.now() < S.startTime) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
+  if (S.startTime && Date.now() < S.startTime - 30 * 60000) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
   const ac = activeCount();
   const gs = r.participants || 1;
   if (ac + gs > S.maxCapacity) { showError('האירוע מלא — אין מקום ל-' + gs + ' משתתפים'); return; }
