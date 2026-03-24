@@ -2076,6 +2076,14 @@ function renderRegSummary() {
 }
 
 function renderRegister() {
+  // Check if event ended
+  if (S.ended) {
+    const regForm = document.getElementById('regFormArea');
+    if (regForm) {
+      regForm.innerHTML = '<div style="text-align:center;padding:40px 20px"><div style="font-size:3rem;margin-bottom:12px">🏁</div><div style="font-size:1.2rem;font-weight:700;margin-bottom:8px">האירוע הסתיים</div><div style="color:var(--muted);font-size:.9rem">הרישום לאירוע זה נסגר. תודה על ההתעניינות!</div><div style="color:var(--muted);font-size:.8rem;margin-top:12px">🌈 חברים של טופי בע״מ</div></div>';
+      return;
+    }
+  }
   if (!S.configured) {
     document.getElementById('regFormSection').style.display = 'none';
     document.getElementById('regSuccessSection').style.display = 'none';
@@ -2856,7 +2864,7 @@ function renderDashboard() {
   if (el('dbCmdActive')) el('dbCmdActive').textContent = ac;
   if (el('dbCmdRegs')) el('dbCmdRegs').textContent = regTotalParticipants;
   if (el('dbCmdPending')) el('dbCmdPending').textContent = regPendingParticipants;
-  if (el('dbCmdWalkin')) el('dbCmdWalkin').textContent = guests.filter(g => !g.checkoutTime && g.type === 'walkin').reduce((s,g) => s + (g.groupSize||1), 0);
+  if (el('dbCmdWalkin')) el('dbCmdWalkin').textContent = guests.filter(g => g.type === 'walkin').reduce((s,g) => s + (g.groupSize||1), 0);
 
   // Active slot
   const dbSlotEl = el('dbActiveSlot');
