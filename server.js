@@ -552,250 +552,413 @@ app.get('/api/events/:id/export', requireAdmin, async (req, res) => {
   const slots = ev.slots || [];
   const timeRange = slots.length > 0 ? `${slots[0].label.split(' - ')[0]} - ${slots[slots.length - 1].label.split(' - ')[1]}` : '';
 
-  // Colors
-  const blue = { argb: 'FF3B82F6' };
-  const green = { argb: 'FF22C55E' };
-  const red = { argb: 'FFEF4444' };
-  const yellow = { argb: 'FFEAB308' };
-  const orange = { argb: 'FFF97316' };
-  const darkBg = { argb: 'FF0F172A' };
-  const cardBg = { argb: 'FF1E293B' };
-  const headerBg = { argb: 'FF334155' };
-  const white = { argb: 'FFF1F5F9' };
+  // === COLORS ===
+  const C = {
+    brand: { argb: 'FF3B82F6' }, brandLight: { argb: 'FFDBEAFE' }, brandDark: { argb: 'FF1E40AF' },
+    green: { argb: 'FF22C55E' }, greenLight: { argb: 'FFDCFCE7' }, greenDark: { argb: 'FF166534' },
+    red: { argb: 'FFEF4444' }, redLight: { argb: 'FFFEE2E2' },
+    yellow: { argb: 'FFEAB308' }, yellowLight: { argb: 'FFFEF9C3' },
+    orange: { argb: 'FFF97316' }, orangeLight: { argb: 'FFFFEDD5' },
+    purple: { argb: 'FFA855F7' }, purpleLight: { argb: 'FFF3E8FF' },
+    gray: { argb: 'FF94A3B8' }, grayLight: { argb: 'FFF1F5F9' }, grayDark: { argb: 'FF334155' },
+    white: { argb: 'FFFFFFFF' }, dark: { argb: 'FF0F172A' },
+  };
 
-  const headerStyle = { font: { bold: true, color: white, size: 11 }, fill: { type: 'pattern', pattern: 'solid', fgColor: headerBg }, alignment: { horizontal: 'center', vertical: 'middle' }, border: { bottom: { style: 'thin', color: { argb: 'FF475569' } } } };
-  const dataStyle = { alignment: { horizontal: 'right', vertical: 'middle' } };
+  const border = (color = 'FFE2E8F0') => ({
+    top: { style: 'thin', color: { argb: color } },
+    bottom: { style: 'thin', color: { argb: color } },
+    left: { style: 'thin', color: { argb: color } },
+    right: { style: 'thin', color: { argb: color } },
+  });
 
-  // ===== SHEET 1: Summary =====
-  const ws1 = wb.addWorksheet('סיכום', { views: [{ rightToLeft: true }] });
-  ws1.columns = [
-    { width: 5 }, { width: 25 }, { width: 20 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 },
-  ];
-
-  // Title
-  ws1.mergeCells('A1:G1');
-  const titleCell = ws1.getCell('A1');
-  titleCell.value = `🌈 ${evTitle}`;
-  titleCell.font = { bold: true, size: 18, color: blue };
-  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  ws1.getRow(1).height = 35;
-
-  ws1.mergeCells('A2:G2');
-  ws1.getCell('A2').value = `${evDate} | ${timeRange}`;
-  ws1.getCell('A2').font = { size: 12, color: green };
-  ws1.getCell('A2').alignment = { horizontal: 'center' };
-
-  ws1.mergeCells('A3:G3');
-  ws1.getCell('A3').value = `איש קשר: ${ev.contactName || '-'} | ${ev.contactPhone || '-'} | כתובת: ${ev.eventAddress || '-'}`;
-  ws1.getCell('A3').font = { size: 10, color: { argb: 'FF94A3B8' } };
-  ws1.getCell('A3').alignment = { horizontal: 'center' };
-
-  // Summary stats
+  // === DATA ===
   const preRegs = Object.values(ev.preRegs || {});
   const guests = Object.values(ev.guests || {});
   const waitlist = Object.values(ev.waitlist || {}).filter(w => w.status === 'waiting');
+  const walkins = guests.filter(g => g.type === 'walkin');
+  const preregGuests = guests.filter(g => g.type === 'preregistered');
+
   const totalRegP = preRegs.reduce((s, r) => s + (r.participants || 1), 0);
   const arrivedP = preRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
   const notArrivedP = totalRegP - arrivedP;
-  const walkinP = guests.filter(g => g.type === 'walkin').reduce((s, g) => s + (g.groupSize || 1), 0);
+  const walkinP = walkins.reduce((s, g) => s + (g.groupSize || 1), 0);
   const totalVisited = guests.reduce((s, g) => s + (g.groupSize || 1), 0);
-  const activeP = guests.filter(g => !g.checkoutTime).reduce((s, g) => s + (g.groupSize || 1), 0);
   const waitlistP = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
   const arrivalRate = totalRegP > 0 ? Math.round(arrivedP / totalRegP * 100) : 0;
 
-  // Average stay calculation
-  const guestsWithDuration = guests.filter(g => g.checkoutTime && g.checkinTime);
-  const avgStayMin = guestsWithDuration.length > 0 ? Math.round(guestsWithDuration.reduce((s, g) => s + (g.checkoutTime - g.checkinTime), 0) / guestsWithDuration.length / 60000) : 0;
-  const avgStayStr = avgStayMin > 0 ? `${avgStayMin} דקות` : '-';
+  const guestsWithDur = guests.filter(g => g.checkoutTime && g.checkinTime);
+  const avgStayMin = guestsWithDur.length > 0 ? Math.round(guestsWithDur.reduce((s, g) => s + (g.checkoutTime - g.checkinTime), 0) / guestsWithDur.length / 60000) : 0;
 
-  const stats = [
-    ['נרשמו מראש (משתתפים)', totalRegP],
-    ['הגיעו מרישום מוקדם', arrivedP],
-    ['לא הגיעו', notArrivedP],
-    ['אחוז הגעה', `${arrivalRate}%`],
-    ['אורחים מזדמנים', walkinP],
-    ['סה"כ ביקרו באירוע', totalVisited],
-    ['שהייה ממוצעת', avgStayStr],
-    ['ברשימת המתנה', waitlistP],
-    ['מקסימום בו-זמנית', ev.maxCapacity],
-    ['סבבים', `${slots.length} x ${ev.slotDurationMin || 30} דק'`],
-  ];
+  // Helper: styled section header
+  function addSectionHeader(ws, text, color, row) {
+    const r = ws.addRow([]);
+    const r2 = ws.addRow(['', text]);
+    r2.height = 32;
+    r2.getCell(2).font = { bold: true, size: 14, color: C.white };
+    for (let i = 1; i <= ws.columnCount; i++) {
+      r2.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: color };
+      r2.getCell(i).border = border(color.argb);
+    }
+    return r2;
+  }
+
+  // Helper: styled table header
+  function addTableHeader(ws, headers, color = C.grayDark) {
+    const r = ws.addRow(headers);
+    r.height = 26;
+    r.eachCell((c) => {
+      c.font = { bold: true, size: 10, color: C.white };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: color };
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+      c.border = border(color.argb);
+    });
+    return r;
+  }
+
+  // Helper: stat card in a row
+  function addStatRow(ws, label, value, color, bgColor) {
+    const r = ws.addRow(['', label, '', '', value]);
+    r.height = 28;
+    r.getCell(2).font = { bold: true, size: 11 };
+    r.getCell(2).alignment = { vertical: 'middle' };
+    r.getCell(5).font = { bold: true, size: 16, color: color };
+    r.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+    if (bgColor) {
+      for (let i = 1; i <= ws.columnCount; i++) {
+        r.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: bgColor };
+        r.getCell(i).border = border();
+      }
+    }
+    return r;
+  }
+
+  // ============================================
+  //  SHEET 1: DASHBOARD — Executive Summary
+  // ============================================
+  const ws1 = wb.addWorksheet('דשבורד מנכ"ל', { views: [{ rightToLeft: true }] });
+  ws1.columns = [{ width: 3 }, { width: 28 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }];
+
+  // === Header Banner ===
+  ws1.mergeCells('A1:G1');
+  ws1.getRow(1).height = 10;
+  for (let i = 1; i <= 7; i++) ws1.getCell(1, i).fill = { type: 'pattern', pattern: 'solid', fgColor: C.brand };
+
+  ws1.mergeCells('A2:G2');
+  ws1.getCell('A2').value = `🌈 ${evTitle}`;
+  ws1.getCell('A2').font = { bold: true, size: 20, color: C.brandDark };
+  ws1.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+  ws1.getRow(2).height = 40;
+
+  ws1.mergeCells('A3:G3');
+  ws1.getCell('A3').value = `📅 ${evDate}   |   🕐 ${timeRange}   |   📍 ${ev.eventAddress || '-'}`;
+  ws1.getCell('A3').font = { size: 11, color: C.gray };
+  ws1.getCell('A3').alignment = { horizontal: 'center' };
+  ws1.getRow(3).height = 22;
+
+  ws1.mergeCells('A4:G4');
+  ws1.getCell('A4').value = `👤 ${ev.contactName || '-'}   |   📞 ${ev.contactPhone || '-'}`;
+  ws1.getCell('A4').font = { size: 10, color: C.gray };
+  ws1.getCell('A4').alignment = { horizontal: 'center' };
+
+  ws1.mergeCells('A5:G5');
+  ws1.getRow(5).height = 6;
+  for (let i = 1; i <= 7; i++) ws1.getCell(5, i).fill = { type: 'pattern', pattern: 'solid', fgColor: C.brand };
+
+  // === KPI Cards (2 rows of 3) ===
+  ws1.addRow([]);
+  const kpiRow1 = ws1.addRow(['', 'נרשמו מראש', '', 'הגיעו בפועל', '', 'אחוז הגעה']);
+  kpiRow1.height = 20;
+  kpiRow1.eachCell(c => { c.font = { size: 9, color: C.gray }; c.alignment = { horizontal: 'center' }; });
+
+  const kpiVal1 = ws1.addRow(['', totalRegP, '', arrivedP, '', `${arrivalRate}%`]);
+  kpiVal1.height = 38;
+  kpiVal1.getCell(2).font = { bold: true, size: 28, color: C.brand };
+  kpiVal1.getCell(2).alignment = { horizontal: 'center' };
+  kpiVal1.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: C.brandLight };
+  kpiVal1.getCell(2).border = border();
+
+  kpiVal1.getCell(4).font = { bold: true, size: 28, color: C.green };
+  kpiVal1.getCell(4).alignment = { horizontal: 'center' };
+  kpiVal1.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: C.greenLight };
+  kpiVal1.getCell(4).border = border();
+
+  kpiVal1.getCell(6).font = { bold: true, size: 28, color: arrivalRate >= 50 ? C.green : arrivalRate >= 30 ? C.yellow : C.red };
+  kpiVal1.getCell(6).alignment = { horizontal: 'center' };
+  kpiVal1.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: arrivalRate >= 50 ? C.greenLight : arrivalRate >= 30 ? C.yellowLight : C.redLight };
+  kpiVal1.getCell(6).border = border();
 
   ws1.addRow([]);
-  const sumHeaderRow = ws1.addRow(['', 'סיכום מנכ"ל', '', 'ערך']);
-  sumHeaderRow.eachCell((c, i) => { if (i > 1) Object.assign(c, headerStyle); });
-  sumHeaderRow.height = 25;
+  const kpiRow2 = ws1.addRow(['', 'לא הגיעו', '', 'מזדמנים', '', 'סה"כ ביקרו']);
+  kpiRow2.height = 20;
+  kpiRow2.eachCell(c => { c.font = { size: 9, color: C.gray }; c.alignment = { horizontal: 'center' }; });
 
-  stats.forEach(([label, val]) => {
-    const r = ws1.addRow(['', label, '', val]);
-    r.getCell(2).font = { bold: true, size: 11 };
-    r.getCell(4).font = { bold: true, size: 13, color: typeof val === 'string' && val.includes('%') ? (arrivalRate >= 50 ? green : red) : blue };
-    r.getCell(4).alignment = { horizontal: 'center' };
+  const kpiVal2 = ws1.addRow(['', notArrivedP, '', walkinP, '', totalVisited]);
+  kpiVal2.height = 38;
+  kpiVal2.getCell(2).font = { bold: true, size: 28, color: C.red };
+  kpiVal2.getCell(2).alignment = { horizontal: 'center' };
+  kpiVal2.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: C.redLight };
+  kpiVal2.getCell(2).border = border();
+
+  kpiVal2.getCell(4).font = { bold: true, size: 28, color: C.orange };
+  kpiVal2.getCell(4).alignment = { horizontal: 'center' };
+  kpiVal2.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: C.orangeLight };
+  kpiVal2.getCell(4).border = border();
+
+  kpiVal2.getCell(6).font = { bold: true, size: 28, color: C.purple };
+  kpiVal2.getCell(6).alignment = { horizontal: 'center' };
+  kpiVal2.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: C.purpleLight };
+  kpiVal2.getCell(6).border = border();
+
+  // === Additional stats ===
+  ws1.addRow([]);
+  addStatRow(ws1, '⏱️ שהייה ממוצעת', avgStayMin > 0 ? `${avgStayMin} דקות` : '-', C.brand, C.grayLight);
+  addStatRow(ws1, '⏳ ברשימת המתנה', `${waitlistP} משתתפים`, C.yellow, null);
+  addStatRow(ws1, '📊 סבבים', `${slots.length} × ${ev.slotDurationMin || 30} דקות`, C.brand, C.grayLight);
+  addStatRow(ws1, '🎯 תפוסה מקסימלית', `${ev.maxCapacity} לסבב`, C.brand, null);
+  if (ev.attractions) addStatRow(ws1, '🎪 אטרקציות', ev.attractions.replace(/\n/g, ', '), C.brand, C.grayLight);
+
+  // === Slot breakdown mini-table ===
+  ws1.addRow([]);
+  addSectionHeader(ws1, '📊 פירוט סבבים', C.brand);
+  addTableHeader(ws1, ['', 'סבב', 'נרשמו', 'הגיעו', 'לא הגיעו', '% הגעה', 'תפוסה']);
+  slots.forEach((sl, i) => {
+    const slRegs = preRegs.filter(r => r.slotIndex === i);
+    const slP = slRegs.reduce((s, r) => s + (r.participants || 1), 0);
+    const slArr = slRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
+    const slRate = slP > 0 ? Math.round(slArr / slP * 100) : 0;
+    const pctFull = Math.round(slP / ev.maxCapacity * 100);
+
+    const r = ws1.addRow(['', `${sl.label}`, slP, slArr, slP - slArr, `${slRate}%`, `${pctFull}%`]);
+    r.eachCell((c, ci) => {
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+      c.border = border();
+      if (ci > 1) c.fill = { type: 'pattern', pattern: 'solid', fgColor: i % 2 === 0 ? C.grayLight : C.white };
+    });
+    r.getCell(6).font = { bold: true, color: slRate >= 50 ? C.green : slRate >= 30 ? C.yellow : C.red };
+    r.getCell(7).font = { bold: true, color: pctFull >= 90 ? C.red : pctFull >= 60 ? C.yellow : C.green };
   });
 
-  // ===== SHEET 2: Registrations by Slot =====
-  const ws2 = wb.addWorksheet('נרשמים לפי סבב', { views: [{ rightToLeft: true }] });
-  ws2.columns = [
-    { width: 5 }, { width: 22 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 12 },
-  ];
+  // === Footer ===
+  ws1.addRow([]); ws1.addRow([]);
+  ws1.addRow(['', `הופק ב: ${new Date().toLocaleString('he-IL')}`]).getCell(2).font = { size: 9, color: C.gray };
+  ws1.addRow(['', '🌈 חברים של טופי בע"מ — ניהול זרימת קהל']).getCell(2).font = { size: 10, color: C.brand, bold: true };
 
-  let rowNum = 1;
+  // ============================================
+  //  SHEET 2: Detailed Registration by Slot
+  // ============================================
+  const ws2 = wb.addWorksheet('פירוט נרשמים', { views: [{ rightToLeft: true }] });
+  ws2.columns = [{ width: 5 }, { width: 24 }, { width: 16 }, { width: 12 }, { width: 18 }, { width: 14 }, { width: 14 }];
+
+  // Title
+  ws2.mergeCells('A1:G1');
+  ws2.getCell('A1').value = `📋 פירוט נרשמים — ${evTitle}`;
+  ws2.getCell('A1').font = { bold: true, size: 16, color: C.brandDark };
+  ws2.getCell('A1').alignment = { horizontal: 'center' };
+  ws2.getRow(1).height = 35;
+
   slots.forEach((sl, i) => {
-    const slotRegs = preRegs.filter(r => r.slotIndex === i).sort((a, b) => (a.registeredAt || 0) - (b.registeredAt || 0));
-    const slotP = slotRegs.reduce((s, r) => s + (r.participants || 1), 0);
-    const slotArrived = slotRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
+    const slRegs = preRegs.filter(r => r.slotIndex === i).sort((a, b) => (a.registeredAt || 0) - (b.registeredAt || 0));
+    const slP = slRegs.reduce((s, r) => s + (r.participants || 1), 0);
+    const slArr = slRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
+    const slRate = slP > 0 ? Math.round(slArr / slP * 100) : 0;
 
     // Slot header
-    const slotNotArrived = slotP - slotArrived;
-    const slotRate = slotP > 0 ? Math.round(slotArrived / slotP * 100) : 0;
-    const slotRow = ws2.addRow(['', `סבב ${i + 1}: ${sl.label}`, `נרשמו: ${slotP}/${ev.maxCapacity}`, `הגיעו: ${slotArrived}`, `לא הגיעו: ${slotNotArrived}`, `${slotRate}% הגעה`]);
-    slotRow.eachCell((c) => {
-      c.font = { bold: true, size: 12, color: white };
-      c.fill = { type: 'pattern', pattern: 'solid', fgColor: blue };
+    ws2.addRow([]);
+    const sh = ws2.addRow(['', `סבב ${i + 1}: ${sl.label}`, `${slP}/${ev.maxCapacity} נרשמו`, `${slArr} הגיעו`, `${slP - slArr} לא הגיעו`, `${slRate}% הגעה`]);
+    sh.height = 30;
+    sh.eachCell(c => {
+      c.font = { bold: true, size: 11, color: C.white };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: slRate >= 50 ? C.green : slRate >= 30 ? C.yellow : C.brand };
       c.alignment = { horizontal: 'center', vertical: 'middle' };
+      c.border = border(C.brand.argb);
     });
-    slotRow.height = 28;
 
-    // Column headers
-    const hRow = ws2.addRow(['#', 'שם', 'טלפון', 'משתתפים', 'תאריך רישום', 'סטטוס']);
-    hRow.eachCell((c) => Object.assign(c, headerStyle));
+    addTableHeader(ws2, ['#', 'שם', 'טלפון', 'משתתפים', 'תאריך רישום', 'סטטוס']);
 
-    if (slotRegs.length === 0) {
-      ws2.addRow(['', 'אין נרשמים לסבב זה']);
+    if (slRegs.length === 0) {
+      const empty = ws2.addRow(['', 'אין נרשמים לסבב זה']);
+      empty.getCell(2).font = { italic: true, color: C.gray };
     } else {
-      slotRegs.forEach((r, idx) => {
+      // Arrived first, then not arrived
+      const sorted = [...slRegs.filter(r => r.arrived), ...slRegs.filter(r => !r.arrived)];
+      sorted.forEach((r, idx) => {
         const regDate = r.registeredAt ? new Date(r.registeredAt).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-        const status = r.arrived ? '✓ הגיע/ה' : '✗ לא הגיע/ה';
+        const status = r.arrived ? '✅ הגיע/ה' : '❌ לא הגיע/ה';
         const row = ws2.addRow([idx + 1, r.name, r.phone || '', r.participants || 1, regDate, status]);
-        row.getCell(6).font = { color: r.arrived ? green : red, bold: true };
-        // Color entire row background for arrived/not
-        if (r.arrived) {
-          for (let ci = 1; ci <= 6; ci++) row.getCell(ci).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
-        } else {
-          for (let ci = 1; ci <= 6; ci++) row.getCell(ci).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4EC' } };
-        }
+        const bgCol = r.arrived ? C.greenLight : C.redLight;
+        row.eachCell((c, ci) => {
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: bgCol };
+          c.border = border();
+          c.alignment = { horizontal: ci <= 1 ? 'center' : 'right', vertical: 'middle' };
+        });
+        row.getCell(6).font = { bold: true, color: r.arrived ? C.greenDark : C.red };
       });
     }
-    ws2.addRow([]); // spacer
   });
 
-  // ===== SHEET 3: Walk-ins =====
+  // ============================================
+  //  SHEET 3: Walk-ins
+  // ============================================
   const ws3 = wb.addWorksheet('מזדמנים', { views: [{ rightToLeft: true }] });
-  ws3.columns = [
-    { width: 5 }, { width: 22 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 },
-  ];
+  ws3.columns = [{ width: 5 }, { width: 24 }, { width: 16 }, { width: 12 }, { width: 14 }, { width: 14 }, { width: 12 }];
 
-  const wkTitle = ws3.addRow(['', `אורחים מזדמנים (${walkinP} משתתפים)`]);
-  wkTitle.getCell(2).font = { bold: true, size: 14, color: orange };
-  wkTitle.height = 28;
+  ws3.mergeCells('A1:G1');
+  ws3.getCell('A1').value = `🚶 אורחים מזדמנים — ${walkinP} משתתפים`;
+  ws3.getCell('A1').font = { bold: true, size: 16, color: C.orange };
+  ws3.getCell('A1').alignment = { horizontal: 'center' };
+  ws3.getRow(1).height = 35;
 
-  const wkHeader = ws3.addRow(['#', 'שם', 'טלפון', 'משתתפים', 'כניסה', 'יציאה', 'משך (דק\')', 'סטטוס']);
-  wkHeader.eachCell((c) => Object.assign(c, headerStyle));
+  addTableHeader(ws3, ['#', 'שם', 'טלפון', 'משתתפים', 'כניסה', 'יציאה', 'משך (דק\')'], C.orange);
 
-  const walkins = guests.filter(g => g.type === 'walkin').sort((a, b) => a.checkinTime - b.checkinTime);
-  const now = Date.now();
-  walkins.forEach((g, idx) => {
-    const dur = g.checkoutTime ? Math.round((g.checkoutTime - g.checkinTime) / 60000) : Math.round((now - g.checkinTime) / 60000);
-    const status = g.checkoutTime ? 'יצא/ה' : 'נוכח/ת';
-    const exit = g.checkoutTime ? formatHM(g.checkoutTime) : '-';
-    const row = ws3.addRow([idx + 1, g.name, g.phone || '', g.groupSize || 1, formatHM(g.checkinTime), exit, dur, status]);
-    row.getCell(8).font = { color: g.checkoutTime ? { argb: 'FF94A3B8' } : green, bold: true };
+  const sortedWalkins = walkins.sort((a, b) => a.checkinTime - b.checkinTime);
+  sortedWalkins.forEach((g, idx) => {
+    const dur = g.checkoutTime ? Math.round((g.checkoutTime - g.checkinTime) / 60000) : '-';
+    const row = ws3.addRow([idx + 1, g.name, g.phone || '', g.groupSize || 1, formatHM(g.checkinTime), g.checkoutTime ? formatHM(g.checkoutTime) : '-', dur]);
+    row.eachCell((c) => {
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: idx % 2 === 0 ? C.orangeLight : C.white };
+      c.border = border();
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
   });
-  if (walkins.length === 0) ws3.addRow(['', 'אין אורחים מזדמנים']);
-
-  // ===== SHEET 4: Waitlist =====
-  if (waitlist.length > 0) {
-    const ws4 = wb.addWorksheet('רשימת המתנה', { views: [{ rightToLeft: true }] });
-    ws4.columns = [{ width: 5 }, { width: 22 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 16 }];
-
-    const wlTitle = ws4.addRow(['', `רשימת המתנה (${waitlistP} משתתפים)`]);
-    wlTitle.getCell(2).font = { bold: true, size: 14, color: yellow };
-
-    const wlHeader = ws4.addRow(['#', 'שם', 'טלפון', 'סבב', 'משתתפים', 'תאריך רישום']);
-    wlHeader.eachCell((c) => Object.assign(c, headerStyle));
-
-    waitlist.sort((a, b) => a.registeredAt - b.registeredAt).forEach((w, idx) => {
-      const regDate = w.registeredAt ? new Date(w.registeredAt).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-      ws4.addRow([idx + 1, w.name, w.phone || '', `סבב ${w.slotIndex + 1}`, w.participants || 1, regDate]);
-    });
+  if (walkins.length === 0) {
+    ws3.addRow(['', 'אין אורחים מזדמנים']).getCell(2).font = { italic: true, color: C.gray };
   }
 
-  // ===== SHEET 5: Insights (all events for this client) =====
+  // ============================================
+  //  SHEET 4: Waitlist
+  // ============================================
+  const ws4 = wb.addWorksheet('רשימת המתנה', { views: [{ rightToLeft: true }] });
+  ws4.columns = [{ width: 5 }, { width: 24 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 18 }];
+
+  ws4.mergeCells('A1:F1');
+  ws4.getCell('A1').value = `⏳ רשימת המתנה — ${waitlistP} משתתפים`;
+  ws4.getCell('A1').font = { bold: true, size: 16, color: C.yellow };
+  ws4.getCell('A1').alignment = { horizontal: 'center' };
+  ws4.getRow(1).height = 35;
+
+  addTableHeader(ws4, ['#', 'שם', 'טלפון', 'סבב', 'משתתפים', 'תאריך רישום'], C.yellow);
+
+  waitlist.sort((a, b) => (a.registeredAt || 0) - (b.registeredAt || 0)).forEach((w, idx) => {
+    const regDate = w.registeredAt ? new Date(w.registeredAt).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    const row = ws4.addRow([idx + 1, w.name, w.phone || '', `סבב ${(w.slotIndex || 0) + 1}`, w.participants || 1, regDate]);
+    row.eachCell(c => {
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: idx % 2 === 0 ? C.yellowLight : C.white };
+      c.border = border();
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+  });
+  if (waitlist.length === 0) {
+    ws4.addRow(['', 'אין ממתינים']).getCell(2).font = { italic: true, color: C.gray };
+  }
+
+  // ============================================
+  //  SHEET 5: Client Insights — Cross-event
+  // ============================================
   const clientEvents = Object.values(db.events).filter(e => e.clientName === ev.clientName).sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
-  if (clientEvents.length > 1) {
-    const ws5 = wb.addWorksheet('תובנות לקוח', { views: [{ rightToLeft: true }] });
-    ws5.columns = [{ width: 5 }, { width: 25 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }];
 
-    const insTitle = ws5.addRow(['', `תובנות — ${ev.clientName}`]);
-    insTitle.getCell(2).font = { bold: true, size: 14, color: blue };
+  const ws5 = wb.addWorksheet('תובנות והשוואה', { views: [{ rightToLeft: true }] });
+  ws5.columns = [{ width: 5 }, { width: 26 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }];
 
-    const insHeader = ws5.addRow(['#', 'אירוע', 'תאריך', 'נרשמו', 'הגיעו', 'לא הגיעו', 'מזדמנים', 'סה"כ ביקרו', 'אחוז הגעה', 'המתנה']);
-    insHeader.eachCell((c) => Object.assign(c, headerStyle));
+  ws5.mergeCells('A1:K1');
+  ws5.getCell('A1').value = `📊 תובנות והשוואת אירועים — ${ev.clientName}`;
+  ws5.getCell('A1').font = { bold: true, size: 18, color: C.brandDark };
+  ws5.getCell('A1').alignment = { horizontal: 'center' };
+  ws5.getRow(1).height = 40;
 
-    clientEvents.forEach((ce, idx) => {
-      const ceRegs = Object.values(ce.preRegs || {});
-      const ceGuests = Object.values(ce.guests || {});
-      const ceRegP = ceRegs.reduce((s, r) => s + (r.participants || 1), 0);
-      const ceArrivedP = ceRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
-      const ceWalkinP = ceGuests.filter(g => g.type === 'walkin').reduce((s, g) => s + (g.groupSize || 1), 0);
-      const ceTotal = ceGuests.reduce((s, g) => s + (g.groupSize || 1), 0);
-      const ceNotArrived = ceRegP - ceArrivedP;
-      const ceWaitlistP = Object.values(ce.waitlist || {}).filter(w => w.status === 'waiting').reduce((s, w) => s + (w.participants || 1), 0);
-      const ceRate = ceRegP > 0 ? `${Math.round(ceArrivedP / ceRegP * 100)}%` : '-';
+  ws5.mergeCells('A2:K2');
+  ws5.getRow(2).height = 5;
+  for (let i = 1; i <= 11; i++) ws5.getCell(2, i).fill = { type: 'pattern', pattern: 'solid', fgColor: C.brand };
 
-      const row = ws5.addRow([idx + 1, ce.eventName || ce.clientName, ce.date || '', ceRegP, ceArrivedP, ceNotArrived, ceWalkinP, ceTotal, ceRate, ceWaitlistP]);
-      if (ce.id === ev.id) row.eachCell(c => { c.font = { ...c.font, bold: true, color: green }; });
-      // Color rate column
-      const rateVal = ceRegP > 0 ? Math.round(ceArrivedP / ceRegP * 100) : 0;
-      row.getCell(9).font = { bold: true, color: rateVal >= 50 ? green : rateVal >= 30 ? yellow : red };
+  // Events comparison table
+  ws5.addRow([]);
+  addSectionHeader(ws5, '🔍 השוואת אירועים', C.brand);
+  addTableHeader(ws5, ['#', 'אירוע', 'תאריך', 'נרשמו', 'הגיעו', 'לא הגיעו', 'מזדמנים', 'סה"כ', '% הגעה', 'המתנה', 'סבבים']);
+
+  let allRegs = 0, allArrived = 0, allWalkins = 0, allTotal = 0, allWaitlist = 0;
+
+  clientEvents.forEach((ce, idx) => {
+    const ceRegs = Object.values(ce.preRegs || {});
+    const ceGuests = Object.values(ce.guests || {});
+    const ceRegP = ceRegs.reduce((s, r) => s + (r.participants || 1), 0);
+    const ceArrivedP = ceRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
+    const ceNotArrived = ceRegP - ceArrivedP;
+    const ceWalkinP = ceGuests.filter(g => g.type === 'walkin').reduce((s, g) => s + (g.groupSize || 1), 0);
+    const ceTotal = ceGuests.reduce((s, g) => s + (g.groupSize || 1), 0);
+    const ceWaitP = Object.values(ce.waitlist || {}).filter(w => w.status === 'waiting').reduce((s, w) => s + (w.participants || 1), 0);
+    const ceRate = ceRegP > 0 ? Math.round(ceArrivedP / ceRegP * 100) : 0;
+
+    allRegs += ceRegP; allArrived += ceArrivedP; allWalkins += ceWalkinP; allTotal += ceTotal; allWaitlist += ceWaitP;
+
+    const row = ws5.addRow([idx + 1, ce.eventName || ce.clientName, ce.date || '', ceRegP, ceArrivedP, ceNotArrived, ceWalkinP, ceTotal, `${ceRate}%`, ceWaitP, ce.numSlots || 0]);
+    const isCurrent = ce.id === ev.id;
+    row.eachCell((c, ci) => {
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+      c.border = border();
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: isCurrent ? C.brandLight : (idx % 2 === 0 ? C.grayLight : C.white) };
+      if (isCurrent) c.font = { bold: true, color: C.brand };
     });
+    row.getCell(9).font = { bold: true, color: ceRate >= 50 ? C.green : ceRate >= 30 ? C.yellow : C.red };
+  });
 
-    // Totals row
-    ws5.addRow([]);
-    const allRegs = clientEvents.reduce((s, ce) => s + Object.values(ce.preRegs || {}).reduce((ss, r) => ss + (r.participants || 1), 0), 0);
-    const allArrived = clientEvents.reduce((s, ce) => s + Object.values(ce.preRegs || {}).filter(r => r.arrived).reduce((ss, r) => ss + (r.participants || 1), 0), 0);
-    const allNotArrived = allRegs - allArrived;
-    const allWalkins = clientEvents.reduce((s, ce) => s + Object.values(ce.guests || {}).filter(g => g.type === 'walkin').reduce((ss, g) => ss + (g.groupSize || 1), 0), 0);
-    const allTotal = clientEvents.reduce((s, ce) => s + Object.values(ce.guests || {}).reduce((ss, g) => ss + (g.groupSize || 1), 0), 0);
-    const allRate = allRegs > 0 ? `${Math.round(allArrived / allRegs * 100)}%` : '-';
-    const totRow = ws5.addRow(['', `סה"כ ${clientEvents.length} אירועים`, '', allRegs, allArrived, allNotArrived, allWalkins, allTotal, allRate, '']);
-    totRow.eachCell(c => { c.font = { bold: true, size: 12, color: blue }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' } }; });
+  // Totals row
+  const allRate = allRegs > 0 ? Math.round(allArrived / allRegs * 100) : 0;
+  const totRow = ws5.addRow(['', `סה"כ ${clientEvents.length} אירועים`, '', allRegs, allArrived, allRegs - allArrived, allWalkins, allTotal, `${allRate}%`, allWaitlist, '']);
+  totRow.height = 30;
+  totRow.eachCell(c => {
+    c.font = { bold: true, size: 12, color: C.white };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: C.brand };
+    c.alignment = { horizontal: 'center', vertical: 'middle' };
+    c.border = border(C.brand.argb);
+  });
 
-    // Insights text
-    ws5.addRow([]);
-    ws5.addRow([]);
-    const insightTitle = ws5.addRow(['', '📊 תובנות']);
-    insightTitle.getCell(2).font = { bold: true, size: 14, color: blue };
+  // === Insights Section ===
+  ws5.addRow([]); ws5.addRow([]);
+  addSectionHeader(ws5, '💡 תובנות אוטומטיות', C.purple);
+  ws5.addRow([]);
 
-    const avgRate = allRegs > 0 ? Math.round(allArrived / allRegs * 100) : 0;
-    const avgVisitors = clientEvents.length > 0 ? Math.round(allTotal / clientEvents.length) : 0;
-    const insights = [
-      `ממוצע הגעה: ${avgRate}% מתוך הנרשמים מגיעים בפועל`,
-      avgRate < 50 ? '⚠️ אחוז ההגעה נמוך — מומלץ לשלוח תזכורות לנרשמים יום לפני האירוע' : '✅ אחוז הגעה טוב',
-      `ממוצע מבקרים: ${avgVisitors} משתתפים לאירוע`,
-      allWalkins > 0 ? `${Math.round(allWalkins / allTotal * 100)}% מהמבקרים הם מזדמנים — יש פוטנציאל לרישום מוקדם גבוה יותר` : '',
-      clientEvents.length >= 3 ? `מגמה: ${clientEvents.length} אירועים — ניתן לזהות דפוסים` : '',
-    ].filter(Boolean);
+  const avgVisitors = clientEvents.length > 0 ? Math.round(allTotal / clientEvents.length) : 0;
+  const walkinPct = allTotal > 0 ? Math.round(allWalkins / allTotal * 100) : 0;
 
-    insights.forEach(t => {
-      const r = ws5.addRow(['', t]);
-      r.getCell(2).font = { size: 11 };
-    });
-  }
+  // Best performing event
+  let bestEvent = null, bestRate = 0;
+  clientEvents.forEach(ce => {
+    const r = Object.values(ce.preRegs || {});
+    const rp = r.reduce((s, x) => s + (x.participants || 1), 0);
+    const ap = r.filter(x => x.arrived).reduce((s, x) => s + (x.participants || 1), 0);
+    const rate = rp > 0 ? Math.round(ap / rp * 100) : 0;
+    if (rate > bestRate) { bestRate = rate; bestEvent = ce; }
+  });
 
-  // Footer
-  ws1.addRow([]);
-  ws1.addRow(['', `הופק ב: ${new Date().toLocaleString('he-IL')}`]);
-  ws1.addRow(['', '🌈 חברים של טופי בע"מ — ניהול זרימת קהל']);
+  const insights = [
+    { icon: '📈', text: `ממוצע הגעה כללי: ${allRate}%`, color: allRate >= 50 ? C.green : C.red },
+    { icon: '👥', text: `ממוצע מבקרים לאירוע: ${avgVisitors} משתתפים`, color: C.brand },
+    { icon: '🚶', text: `${walkinPct}% מהמבקרים הם מזדמנים — ${walkinPct > 30 ? 'פוטנציאל גבוה לרישום מוקדם' : 'רוב המבקרים נרשמים מראש'}`, color: C.orange },
+    allRate < 40 ? { icon: '⚠️', text: 'המלצה: שלחו תזכורות SMS/WhatsApp יום לפני האירוע להעלאת אחוז ההגעה', color: C.red } : { icon: '✅', text: 'אחוז הגעה טוב — המשיכו כך!', color: C.green },
+    bestEvent ? { icon: '🏆', text: `האירוע המוביל: ${bestEvent.eventName || bestEvent.clientName} (${bestRate}% הגעה)`, color: C.green } : null,
+    clientEvents.length >= 3 ? { icon: '📊', text: `נצברו ${clientEvents.length} אירועים — ניתן לזהות מגמות`, color: C.purple } : null,
+    allWaitlist > 0 ? { icon: '⏳', text: `${allWaitlist} אנשים ברשימות המתנה — שקלו להגדיל קיבולת`, color: C.yellow } : null,
+  ].filter(Boolean);
+
+  insights.forEach((ins, idx) => {
+    const r = ws5.addRow(['', `${ins.icon}  ${ins.text}`]);
+    r.height = 24;
+    r.getCell(2).font = { size: 11, color: ins.color };
+    if (idx % 2 === 0) r.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: C.grayLight };
+  });
+
+  // === Footer ===
+  ws5.addRow([]); ws5.addRow([]);
+  const footerRow = ws5.addRow(['', `🌈 חברים של טופי בע"מ — הופק ב: ${new Date().toLocaleString('he-IL')}`]);
+  footerRow.getCell(2).font = { size: 10, color: C.brand, bold: true };
 
   // Send file
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename=report_${ev.id}.xlsx`);
+  res.setHeader('Content-Disposition', `attachment; filename=report_${ev.eventName || ev.clientName}_${ev.date || ''}.xlsx`);
   await wb.xlsx.write(res);
   res.end();
 });
 
-// ========== CATCH-ALL ==========
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -823,3 +986,5 @@ const PORT = process.env.PORT || 3333;
     console.log(`========================================\n`);
   });
 })();
+
+// (end of file)
