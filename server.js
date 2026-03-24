@@ -98,6 +98,14 @@ function randomId() { return crypto.randomBytes(6).toString('hex'); }
 
 function sanitize(str, max = 100) { return (str || '').trim().slice(0, max); }
 
+// Normalize phone: +972 → 0, remove dashes/spaces, keep last 10 digits
+function normalizePhone(phone) {
+  if (!phone) return '';
+  let p = phone.replace(/[^0-9]/g, '');
+  if (p.startsWith('972') && p.length > 10) p = '0' + p.slice(3);
+  return p.slice(-10);
+}
+
 function formatHM(ts) {
   return new Date(ts).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' });
 }
@@ -268,8 +276,8 @@ app.post('/api/events/:id/register', registerLimiter, (req, res) => {
   if (!cleanPhone.match(/^05\d{8}$/)) return res.status(400).json({ error: 'מספר טלפון לא תקין — נדרש מספר ישראלי (05X) עם 10 ספרות' });
 
   // Check duplicate phone registration
-  const normalNewPhone = phone.replace(/[^0-9]/g, '');
-  const existingReg = Object.values(ev.preRegs).find(r => r.phone && r.phone.replace(/[^0-9]/g, '') === normalNewPhone);
+  const normalNewPhone = normalizePhone(phone);
+  const existingReg = Object.values(ev.preRegs).find(r => normalizePhone(r.phone) === normalNewPhone);
   if (existingReg) {
     return res.status(400).json({ error: 'מספר הטלפון כבר רשום לאירוע זה', existingCode: existingReg.code, existingSlot: existingReg.slotIndex, existingParticipants: existingReg.participants });
   }
@@ -284,9 +292,15 @@ app.post('/api/events/:id/register', registerLimiter, (req, res) => {
   const isFull = slotParticipants + pCount > ev.maxCapacity;
   const code = randomCode(6);
 
+  // Check waitlist for duplicate phone too
+  if (!ev.waitlist) ev.waitlist = {};
+  const existingWaitlist = Object.values(ev.waitlist).find(w => w.status === 'waiting' && normalizePhone(w.phone) === normalNewPhone);
+  if (existingWaitlist) {
+    return res.status(400).json({ error: 'מספר הטלפון כבר רשום ברשימת ההמתנה לאירוע זה' });
+  }
+
   if (isFull) {
     // Add to waitlist
-    if (!ev.waitlist) ev.waitlist = {};
     ev.waitlist[code] = {
       code, name: sanitize(name), phone: sanitize(phone, 20),
       registeredAt: Date.now(), slotIndex: parseInt(slotIndex),
@@ -321,12 +335,12 @@ app.post('/api/events/:id/checkin', requireAdmin, (req, res) => {
   if (!cleanPhone.match(/^05\d{8}$/)) return res.status(400).json({ error: 'מספר טלפון לא תקין — נדרש מספר ישראלי (05X) עם 10 ספרות' });
 
     // Check if phone already exists in pre-regs or guests
-    const normalPhone = phone.replace(/[^0-9]/g, '');
-    const existingReg = Object.values(ev.preRegs).find(r => r.phone && r.phone.replace(/[^0-9]/g, '') === normalPhone);
+    const normalPhone = normalizePhone(phone);
+    const existingReg = Object.values(ev.preRegs).find(r => normalizePhone(r.phone) === normalPhone);
     if (existingReg) {
       return res.status(400).json({ error: `מספר הטלפון כבר רשום מראש (קוד: ${existingReg.code})` });
     }
-    const existingGuest = Object.values(ev.guests).filter(g => !g.checkoutTime).find(g => g.phone && g.phone.replace(/[^0-9]/g, '') === normalPhone);
+    const existingGuest = Object.values(ev.guests).filter(g => !g.checkoutTime).find(g => normalizePhone(g.phone) === normalPhone);
     if (existingGuest) {
       return res.status(400).json({ error: 'מספר הטלפון כבר נמצא באירוע' });
     }
@@ -356,9 +370,9 @@ app.post('/api/events/:id/checkin', requireAdmin, (req, res) => {
 
   // Try phone number
   if (!reg) {
-    const normalPhone = input.replace(/[^0-9]/g, '');
+    const normalPhone = normalizePhone(input);
     if (normalPhone.length >= 9) {
-      const match = Object.entries(ev.preRegs).find(([, r]) => r.phone && r.phone.replace(/[^0-9]/g, '') === normalPhone);
+      const match = Object.entries(ev.preRegs).find(([, r]) => normalizePhone(r.phone) === normalPhone);
       if (match) { matchedCode = match[0]; reg = match[1]; }
     }
   }
@@ -458,8 +472,8 @@ app.put('/api/events/:id/register', (req, res) => {
   if (!ev || !ev.configured) return res.status(404).json({ error: 'אירוע לא נמצא' });
   const { phone, participants, slotIndex } = req.body;
   if (!phone) return res.status(400).json({ error: 'נא להזין מספר טלפון' });
-  const normalPhone = phone.replace(/[^0-9]/g, '');
-  const entry = Object.entries(ev.preRegs).find(([, r]) => r.phone && r.phone.replace(/[^0-9]/g, '') === normalPhone);
+  const normalPhone = normalizePhone(phone);
+  const entry = Object.entries(ev.preRegs).find(([, r]) => normalizePhone(r.phone) === normalPhone);
   if (!entry) return res.status(404).json({ error: 'לא נמצאה הרשמה עם מספר זה' });
   const [code, reg] = entry;
   if (reg.arrived) return res.status(400).json({ error: 'לא ניתן לעדכן — כבר נכנסת לאירוע' });
