@@ -1044,7 +1044,7 @@
   <div id="dbMembersList" class="card"></div>
 
   <div class="actions-row" style="margin-top:16px;gap:8px;flex-wrap:wrap">
-    <button class="btn-sm blue" onclick="exportCSV()" style="flex:1;padding:12px;font-size:.85rem">&#128196; ייצוא CSV</button>
+    <button class="btn-sm blue" onclick="exportCSV()" style="flex:1;padding:12px;font-size:.85rem">&#128202; ייצוא Excel</button>
     <button class="btn-sm green" onclick="exportRatingSummary()" style="flex:1;padding:12px;font-size:.85rem">&#11088; סיכום דירוגים</button>
     <button class="btn-sm orange" onclick="exportMembersSummary()" style="flex:1;padding:12px;font-size:.85rem">&#128101; סיכום חברים</button>
   </div>
@@ -3362,6 +3362,13 @@ function selectLiveTab(eventId) {
 //  CSV EXPORT
 // ============================================================
 function exportCSV() {
+  if (!activeEventId) { showError('לא נבחר אירוע'); return; }
+  if (apiToken) {
+    // Use server XLSX export
+    window.open('/api/events/' + activeEventId + '/export?token=' + apiToken, '_blank');
+    return;
+  }
+  // Fallback: local CSV
   const now = Date.now();
   const bom = '\uFEFF';
   const evTitle = S.eventName ? `${S.eventName} — ${S.clientName}` : S.clientName;
