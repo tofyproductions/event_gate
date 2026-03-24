@@ -3364,44 +3364,132 @@ function selectLiveTab(eventId) {
 function exportCSV() {
   const now = Date.now();
   const bom = '\uFEFF';
-  let csv = bom + 'שם,טלפון,סוג,סבב,משתתפים,כניסה,יציאה,משך (דקות),סטטוס\n';
+  const evTitle = S.eventName ? `${S.eventName} — ${S.clientName}` : S.clientName;
+  const evDate = S.startTime ? new Date(S.startTime).toLocaleDateString('he-IL', {weekday:'long', year:'numeric', month:'long', day:'numeric'}) : '';
+  const slots = S.slots || [];
+  const timeRange = slots.length > 0 ? slots[0].label.split(' - ')[0] + ' - ' + slots[slots.length-1].label.split(' - ')[1] : '';
 
-  activeGuests().forEach(g => {
-    const dur = Math.round((now - g.checkinTime) / 60000);
-    const type = g.type === 'preregistered' ? 'מראש' : 'הזדמן';
-    const slot = g.slotIndex >= 0 ? `סבב ${g.slotIndex + 1}` : '-';
-    csv += `"${csvSafe(g.name)}","${csvSafe(g.phone || '')}",${type},${slot},${g.groupSize || 1},${formatHM(g.checkinTime)},,${dur},נוכח\n`;
+  let csv = bom;
+
+  // ===== HEADER =====
+  csv += `דוח אירוע — ${csvSafe(evTitle)}\n`;
+  csv += `תאריך: ${evDate}\n`;
+  csv += `שעות: ${timeRange}\n`;
+  csv += `כתובת: ${csvSafe(S.eventAddress || '-')}\n`;
+  csv += `איש קשר: ${csvSafe(S.contactName || '-')} | ${csvSafe(S.contactPhone || '-')}\n`;
+  csv += `מקסימום משתתפים בסבב: ${S.maxCapacity}\n`;
+  csv += `\n`;
+
+  // ===== SECTION 1: REGISTERED BY SLOT =====
+  csv += `════════════════════════════════════════\n`;
+  csv += `נרשמים מראש — לפי סבבים\n`;
+  csv += `════════════════════════════════════════\n\n`;
+
+  const preRegs = Object.values(S.preRegs || {});
+  let totalRegParticipants = 0;
+  let totalArrived = 0;
+  let totalNotArrived = 0;
+
+  slots.forEach((sl, i) => {
+    const slotRegs = preRegs.filter(r => r.slotIndex === i).sort((a, b) => (a.registeredAt || 0) - (b.registeredAt || 0));
+    const slotTotal = slotRegs.reduce((s, r) => s + (r.participants || 1), 0);
+    const slotArrived = slotRegs.filter(r => r.arrived).reduce((s, r) => s + (r.participants || 1), 0);
+
+    csv += `--- סבב ${i + 1}: ${sl.label} (${slotTotal}/${S.maxCapacity} נרשמו | ${slotArrived} הגיעו) ---\n`;
+    csv += `#,שם,טלפון,משתתפים,תאריך רישום,סטטוס\n`;
+
+    slotRegs.forEach((r, idx) => {
+      const regDate = r.registeredAt ? new Date(r.registeredAt).toLocaleString('he-IL', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : '';
+      const status = r.arrived ? '✓ הגיע/ה' : '✗ לא הגיע/ה';
+      csv += `${idx + 1},"${csvSafe(r.name)}","${csvSafe(r.phone || '')}",${r.participants || 1},"${regDate}",${status}\n`;
+      totalRegParticipants += (r.participants || 1);
+      if (r.arrived) totalArrived += (r.participants || 1);
+      else totalNotArrived += (r.participants || 1);
+    });
+
+    if (slotRegs.length === 0) csv += `-,אין נרשמים לסבב זה,,,,\n`;
+    csv += `\n`;
   });
 
-  historyGuests().forEach(g => {
-    const dur = Math.round((g.checkoutTime - g.checkinTime) / 60000);
-    const type = g.type === 'preregistered' ? 'מראש' : 'הזדמן';
-    const slot = g.slotIndex >= 0 ? `סבב ${g.slotIndex + 1}` : '-';
-    csv += `"${csvSafe(g.name)}","${csvSafe(g.phone || '')}",${type},${slot},${g.groupSize || 1},${formatHM(g.checkinTime)},${formatHM(g.checkoutTime)},${dur},יצא\n`;
-  });
+  csv += `סה"כ נרשמים מראש (משתתפים): ${totalRegParticipants}\n`;
+  csv += `הגיעו: ${totalArrived} | לא הגיעו: ${totalNotArrived}\n`;
+  csv += `\n`;
 
-  Object.values(S.preRegs).filter(r => !r.arrived).forEach(r => {
-    const slot = `סבב ${r.slotIndex + 1}`;
-    csv += `"${csvSafe(r.name)}","${csvSafe(r.phone || '')}",מראש,${slot},${r.participants || 1},,,,לא הגיע\n`;
-  });
+  // ===== SECTION 2: WALK-INS =====
+  const walkins = Object.values(S.guests || {}).filter(g => g.type === 'walkin');
+  csv += `════════════════════════════════════════\n`;
+  csv += `אורחים מזדמנים (${walkins.reduce((s, g) => s + (g.groupSize || 1), 0)} משתתפים)\n`;
+  csv += `════════════════════════════════════════\n`;
+  csv += `#,שם,טלפון,משתתפים,כניסה,יציאה,משך (דקות),סטטוס\n`;
 
-  // Waitlist section
+  if (walkins.length > 0) {
+    walkins.sort((a, b) => a.checkinTime - b.checkinTime).forEach((g, idx) => {
+      const dur = g.checkoutTime ? Math.round((g.checkoutTime - g.checkinTime) / 60000) : Math.round((now - g.checkinTime) / 60000);
+      const status = g.checkoutTime ? 'יצא/ה' : 'נוכח/ת';
+      const exit = g.checkoutTime ? formatHM(g.checkoutTime) : '-';
+      csv += `${idx + 1},"${csvSafe(g.name)}","${csvSafe(g.phone || '')}",${g.groupSize || 1},${formatHM(g.checkinTime)},${exit},${dur},${status}\n`;
+    });
+  } else {
+    csv += `-,אין אורחים מזדמנים,,,,,,\n`;
+  }
+  csv += `\n`;
+
+  // ===== SECTION 3: ALL ACTIVE GUESTS =====
+  const active = Object.values(S.guests || {}).filter(g => !g.checkoutTime);
+  const activeTotal = active.reduce((s, g) => s + (g.groupSize || 1), 0);
+  csv += `════════════════════════════════════════\n`;
+  csv += `נוכחים כרגע באירוע (${activeTotal} משתתפים)\n`;
+  csv += `════════════════════════════════════════\n`;
+  csv += `#,שם,טלפון,סוג,משתתפים,כניסה,משך (דקות)\n`;
+
+  if (active.length > 0) {
+    active.sort((a, b) => a.checkinTime - b.checkinTime).forEach((g, idx) => {
+      const dur = Math.round((now - g.checkinTime) / 60000);
+      const type = g.type === 'preregistered' ? 'נרשם מראש' : 'מזדמן';
+      csv += `${idx + 1},"${csvSafe(g.name)}","${csvSafe(g.phone || '')}",${type},${g.groupSize || 1},${formatHM(g.checkinTime)},${dur}\n`;
+    });
+  } else {
+    csv += `-,אין נוכחים כרגע,,,,,\n`;
+  }
+  csv += `\n`;
+
+  // ===== SECTION 4: WAITLIST =====
   const waitlist = Object.values(S.waitlist || {}).filter(w => w.status === 'waiting');
   if (waitlist.length > 0) {
-    csv += '\n\nרשימת המתנה\nשם,טלפון,סבב,משתתפים,תאריך רישום,סטטוס\n';
-    waitlist.sort((a, b) => a.registeredAt - b.registeredAt).forEach(w => {
+    const waitTotal = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
+    csv += `════════════════════════════════════════\n`;
+    csv += `רשימת המתנה (${waitTotal} משתתפים)\n`;
+    csv += `════════════════════════════════════════\n`;
+    csv += `#,שם,טלפון,סבב,משתתפים,תאריך רישום\n`;
+    waitlist.sort((a, b) => a.registeredAt - b.registeredAt).forEach((w, idx) => {
       const slot = `סבב ${w.slotIndex + 1}`;
-      const regDate = w.registeredAt ? new Date(w.registeredAt).toLocaleString('he-IL', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
-      csv += `"${csvSafe(w.name)}","${csvSafe(w.phone || '')}",${slot},${w.participants || 1},"${regDate}",ממתין/ה\n`;
+      const regDate = w.registeredAt ? new Date(w.registeredAt).toLocaleString('he-IL', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : '';
+      csv += `${idx + 1},"${csvSafe(w.name)}","${csvSafe(w.phone || '')}",${slot},${w.participants || 1},"${regDate}"\n`;
     });
-    const waitlistTotal = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
-    csv += `סה"כ ממתינים (משתתפים),${waitlistTotal}\n`;
+    csv += `\n`;
   }
 
-  const totalParticipants = Object.values(S.guests).reduce((s, g) => s + (g.groupSize || 1), 0);
-  const totalRegsParticipants = Object.values(S.preRegs).reduce((s, r) => s + (r.participants || 1), 0);
-  const totalWaitlist = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
-  csv += `\nסיכום\nסה"כ ביקרו (משתתפים),${totalParticipants}\nנוכחים כרגע,${activeCount()}\nנרשמו מראש (משתתפים),${totalRegsParticipants}\nממתינים (משתתפים),${totalWaitlist}\n`;
+  // ===== SECTION 5: SUMMARY =====
+  const allGuests = Object.values(S.guests || {});
+  const totalVisited = allGuests.reduce((s, g) => s + (g.groupSize || 1), 0);
+  const preRegGuests = allGuests.filter(g => g.type === 'preregistered').reduce((s, g) => s + (g.groupSize || 1), 0);
+  const walkinGuests = allGuests.filter(g => g.type === 'walkin').reduce((s, g) => s + (g.groupSize || 1), 0);
+  const waitlistTotal = waitlist.reduce((s, w) => s + (w.participants || 1), 0);
+
+  csv += `════════════════════════════════════════\n`;
+  csv += `סיכום מנכ"ל\n`;
+  csv += `════════════════════════════════════════\n`;
+  csv += `נרשמו מראש (משתתפים),${totalRegParticipants}\n`;
+  csv += `הגיעו מרישום מוקדם,${totalArrived}\n`;
+  csv += `לא הגיעו מרישום מוקדם,${totalNotArrived}\n`;
+  csv += `אחוז הגעה מנרשמים,${totalRegParticipants > 0 ? Math.round(totalArrived / totalRegParticipants * 100) : 0}%\n`;
+  csv += `אורחים מזדמנים (משתתפים),${walkinGuests}\n`;
+  csv += `סה"כ ביקרו באירוע (משתתפים),${totalVisited}\n`;
+  csv += `נוכחים כרגע,${activeTotal}\n`;
+  csv += `ברשימת המתנה,${waitlistTotal}\n`;
+  csv += `\n`;
+  csv += `הופק ב: ${new Date().toLocaleString('he-IL')}\n`;
+  csv += `חברים של טופי בע"מ — ניהול זרימת קהל\n`;
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
