@@ -1085,6 +1085,28 @@ tr.waitlist{background:rgba(234,179,8,.06)}
 .footer{text-align:center;padding:20px;color:#475569;font-size:.75rem;border-top:1px solid #334155;margin-top:20px}
 .footer .brand{font-size:.9rem;color:#60a5fa;font-weight:700}
 
+/* Mobile */
+@media(max-width:600px){
+  .report{padding:12px}
+  .header{padding:16px;border-radius:14px}
+  .header h1{font-size:1.2rem}
+  .header .meta{font-size:.7rem}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+  .kpi{padding:14px 8px;border-radius:12px}
+  .kpi-val{font-size:1.6rem}
+  .kpi-label{font-size:.65rem}
+  .section{padding:14px;border-radius:12px}
+  .section-title{font-size:.9rem}
+  table{font-size:.65rem;display:block;overflow-x:auto;white-space:nowrap}
+  th,td{padding:6px 4px}
+  .slot-bar{padding:8px}
+  .slot-header{font-size:.75rem}
+  .slot-stats{gap:8px;font-size:.65rem;flex-wrap:wrap}
+  .chart-label{width:80px;font-size:.65rem}
+  .insight{font-size:.75rem;padding:8px 10px}
+  .no-print button{padding:10px 20px;font-size:.85rem;display:block;width:100%;margin:4px 0}
+}
+
 @media print{
   body{background:white;color:#1e293b}
   .no-print{display:none}
