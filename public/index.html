@@ -3131,7 +3131,8 @@ function approveWaitlist(code) {
         const waPhone = formatPhoneForWA(phone);
         const evTitle = S.eventName ? S.eventName + ' — ' + S.clientName : S.clientName || '';
         const slot = S.slots && S.slots[data.reg.slotIndex] ? S.slots[data.reg.slotIndex].label : '';
-        const msg = `שלום ${data.reg.name}! 🎉\n\nמקום התפנה באירוע *${evTitle}*!\n\nקוד הכניסה שלכם: *${code}*\nסבב: ${slot}\n\nנתראה! 🌈 חברים של טופי בע״מ`;
+        const evDate = S.startTime ? new Date(S.startTime).toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '';
+        const msg = `שלום ${data.reg.name}! 🎉\n\nמקום התפנה באירוע *${evTitle}*!\n📅 ${evDate}\n\nקוד הכניסה שלכם: *${code}*\nסבב: ${slot}\n\nנתראה! 🌈 חברים של טופי בע״מ`;
         if (waPhone) {
           const waUrl = 'https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg);
           // Show popup with WhatsApp button instead of auto-redirect
