@@ -483,6 +483,103 @@ app.get('/api/events/:id/full', requireAdmin, (req, res) => {
   res.json(ev);
 });
 
+// ========== API: GUEST RELIABILITY ==========
+function buildGuestProfiles() {
+  const profiles = {}; // phone -> profile
+  const now = Date.now();
+
+  for (const ev of Object.values(db.events || {})) {
+    if (!ev.configured) continue;
+    const eventEnded = ev.slots && ev.slots.length > 0 && now > ev.slots[ev.slots.length - 1].endTime;
+    const evInfo = { id: ev.id, name: ev.eventName || ev.clientName, date: ev.date };
+
+    // Scan preRegs
+    for (const reg of Object.values(ev.preRegs || {})) {
+      const phone = normalizePhone(reg.phone);
+      if (!phone || phone.length < 10) continue;
+      if (!profiles[phone]) profiles[phone] = { phone, names: [], registered: 0, arrived: 0, noShow: 0, events: [], totalParticipants: 0 };
+      const p = profiles[phone];
+      if (!p.names.includes(reg.name)) p.names.push(reg.name);
+      p.registered++;
+      p.totalParticipants += (reg.participants || 1);
+      if (reg.arrived) {
+        p.arrived++;
+        p.events.push({ ...evInfo, status: 'arrived', participants: reg.participants || 1 });
+      } else if (eventEnded) {
+        p.noShow++;
+        p.events.push({ ...evInfo, status: 'noshow', participants: reg.participants || 1 });
+      } else {
+        p.events.push({ ...evInfo, status: 'pending', participants: reg.participants || 1 });
+      }
+    }
+
+    // Scan waitlist
+    for (const w of Object.values(ev.waitlist || {})) {
+      const phone = normalizePhone(w.phone);
+      if (!phone || phone.length < 10) continue;
+      if (!profiles[phone]) profiles[phone] = { phone, names: [], registered: 0, arrived: 0, noShow: 0, events: [], totalParticipants: 0 };
+      profiles[phone].events.push({ ...evInfo, status: 'waitlist', participants: w.participants || 1 });
+    }
+
+    // Scan walk-in guests
+    for (const g of Object.values(ev.guests || {})) {
+      if (g.type !== 'walkin') continue;
+      const phone = normalizePhone(g.phone);
+      if (!phone || phone.length < 10) continue;
+      if (!profiles[phone]) profiles[phone] = { phone, names: [], registered: 0, arrived: 0, noShow: 0, events: [], totalParticipants: 0 };
+      const p = profiles[phone];
+      if (!p.names.includes(g.name)) p.names.push(g.name);
+      p.arrived++;
+      p.totalParticipants += (g.groupSize || 1);
+      p.events.push({ ...evInfo, status: 'walkin', participants: g.groupSize || 1 });
+    }
+  }
+
+  // Calculate scores
+  for (const p of Object.values(profiles)) {
+    const total = p.registered + (p.events.filter(e => e.status === 'walkin').length);
+    p.totalEvents = total;
+    const arrivedTotal = p.arrived;
+    if (p.registered === 0) {
+      p.reliabilityScore = arrivedTotal > 0 ? 100 : 0;
+      p.tier = 'walkin';
+    } else {
+      p.reliabilityScore = Math.round(p.arrived / p.registered * 100);
+      if (p.reliabilityScore >= 80 && p.registered >= 2) p.tier = 'gold';
+      else if (p.reliabilityScore >= 50) p.tier = 'regular';
+      else if (p.registered >= 2) p.tier = 'low';
+      else p.tier = 'new';
+    }
+  }
+  return profiles;
+}
+
+// Get all guest profiles (admin)
+app.get('/api/guests/profiles', requireAdmin, (req, res) => {
+  const profiles = buildGuestProfiles();
+  const list = Object.values(profiles).sort((a, b) => b.totalEvents - a.totalEvents);
+  res.json({
+    profiles: list,
+    summary: {
+      total: list.length,
+      gold: list.filter(p => p.tier === 'gold').length,
+      regular: list.filter(p => p.tier === 'regular').length,
+      low: list.filter(p => p.tier === 'low').length,
+      new: list.filter(p => p.tier === 'new').length,
+      walkin: list.filter(p => p.tier === 'walkin').length,
+    }
+  });
+});
+
+// Get single guest profile by phone (admin)
+app.get('/api/guests/profile/:phone', requireAdmin, (req, res) => {
+  const profiles = buildGuestProfiles();
+  const phone = normalizePhone(req.params.phone);
+  const profile = profiles[phone];
+  if (!profile) return res.status(404).json({ error: 'אורח לא נמצא' });
+  res.json(profile);
+});
+
 // ========== API: MEMBERS ==========
 app.post('/api/members', (req, res) => {
   const { name, phone, city, childAges } = req.body;
