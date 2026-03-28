@@ -86,6 +86,28 @@ let db = loadDBFromFile();
 // Auto-save every 30 seconds
 setInterval(saveDB, 30000);
 
+// Auto-checkout: every 60 seconds, check ended events and checkout remaining guests
+setInterval(() => {
+  const now = Date.now();
+  for (const ev of Object.values(db.events || {})) {
+    if (!ev.configured || !ev.slots || ev.slots.length === 0) continue;
+    const lastSlotEnd = ev.slots[ev.slots.length - 1].endTime;
+    if (now < lastSlotEnd) continue;
+    let changed = false;
+    for (const guest of Object.values(ev.guests || {})) {
+      if (!guest.checkoutTime) {
+        guest.checkoutTime = lastSlotEnd;
+        guest.autoCheckout = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      saveDB();
+      console.log(`Auto-checkout: ${ev.eventName || ev.clientName}`);
+    }
+  }
+}, 60000);
+
 // ========== HELPERS ==========
 function randomCode(len = 6) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
