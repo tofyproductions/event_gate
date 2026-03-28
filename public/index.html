@@ -3140,7 +3140,11 @@ function approveWaitlist(code) {
 
 נתראה! 🌈`;
         if (waPhone) {
-          window.open('https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg), '_blank');
+          // Use location.href for mobile compatibility (window.open blocked as popup)
+          const waUrl = 'https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg);
+          setTimeout(() => { window.location.href = waUrl; }, 300);
+        } else {
+          showSuccess('אושר! אבל אין מספר טלפון — שלחו את הקוד ידנית: ' + code);
         }
       }
     }).catch(() => showError('שגיאה באישור'));
