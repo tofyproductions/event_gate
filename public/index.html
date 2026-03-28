@@ -3114,7 +3114,7 @@ function releaseReg(code) {
 }
 
 function approveWaitlist(code) {
-  if (!confirm('לאשר את הממתין/ה ולשלוח קוד כניסה בוואצאפ?')) return;
+  if (!confirm('לאשר את הממתין/ה?')) return;
   if (apiToken) {
     fetch('/api/events/' + activeEventId + '/waitlist/' + code + '/approve', {
       method: 'POST', headers: { 'x-admin-token': apiToken }
@@ -3124,30 +3124,24 @@ function approveWaitlist(code) {
         if (S.waitlist && S.waitlist[code]) delete S.waitlist[code];
         S.preRegs[code] = data.reg;
         save();
-        showSuccess('הממתין/ה אושר/ה! נפתח וואצאפ לשליחת הקוד...');
         renderAll();
-        // Send WhatsApp with code
+        // Build WhatsApp URL
         const phone = data.reg.phone || '';
         const waPhone = formatPhoneForWA(phone);
-        const evTitle = S.eventName ? S.eventName + ' — ' + S.clientName : S.clientName;
+        const evTitle = S.eventName ? S.eventName + ' — ' + S.clientName : S.clientName || '';
         const slot = S.slots && S.slots[data.reg.slotIndex] ? S.slots[data.reg.slotIndex].label : '';
-        const msg = `שלום ${data.reg.name}! 🎉
-
-מקום התפנה באירוע *${evTitle}*!
-
-קוד הכניסה שלכם: *${code}*
-סבב: ${slot}
-
-נתראה! 🌈`;
+        const msg = `שלום ${data.reg.name}! 🎉\n\nמקום התפנה באירוע *${evTitle}*!\n\nקוד הכניסה שלכם: *${code}*\nסבב: ${slot}\n\nנתראה! 🌈 חברים של טופי בע״מ`;
         if (waPhone) {
-          // Use location.href for mobile compatibility (window.open blocked as popup)
           const waUrl = 'https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg);
-          setTimeout(() => { window.location.href = waUrl; }, 300);
+          // Show popup with WhatsApp button instead of auto-redirect
+          showWaPopup(data.reg.name, code, waUrl);
         } else {
-          showSuccess('אושר! אבל אין מספר טלפון — שלחו את הקוד ידנית: ' + code);
+          showSuccess('אושר! קוד הכניסה: ' + code + ' — אין מספר טלפון לשליחה');
         }
+      } else {
+        showError(data.error || 'שגיאה באישור');
       }
-    }).catch(() => showError('שגיאה באישור'));
+    }).catch(e => showError('שגיאה באישור: ' + e.message));
   } else {
     // Local fallback
     if (S.waitlist && S.waitlist[code]) {
@@ -3159,6 +3153,29 @@ function approveWaitlist(code) {
       renderAll();
     }
   }
+}
+
+function showWaPopup(name, code, waUrl) {
+  // Remove old popup if exists
+  const old = document.getElementById('waPopupOverlay');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'waPopupOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML = `
+    <div style="background:var(--card,#1e293b);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center;border:1px solid #334155">
+      <div style="font-size:2rem;margin-bottom:8px">✅</div>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:4px">${name} אושר/ה!</div>
+      <div style="font-size:.85rem;color:#94a3b8;margin-bottom:6px">קוד כניסה: <strong style="color:#60a5fa;font-size:1.1rem">${code}</strong></div>
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+        <a href="${waUrl}" target="_blank" rel="noopener" style="display:block;padding:14px;background:linear-gradient(135deg,#22c55e,#16a34a);color:white;border-radius:14px;font-size:1rem;font-weight:700;text-decoration:none">📲 שלח קוד בוואצאפ</a>
+        <button onclick="this.closest('#waPopupOverlay').remove()" style="padding:12px;background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:12px;font-size:.9rem;cursor:pointer">סגור</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
 function removeWaitlist(code) {
