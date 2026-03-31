@@ -2375,7 +2375,11 @@ function doCodeCheckin() {
 
   if (!reg) { showError('לא נמצאה הרשמה עם קוד או טלפון זה'); return; }
   if (reg.arrived) { showError('כבר נרשם/ה כנוכח/ת'); return; }
-  if (activeCount() >= S.maxCapacity) { showError('האירוע מלא כרגע'); return; }
+  const _ac = activeCount();
+  const _gs = reg.participants || 1;
+  if (_ac + _gs > S.maxCapacity) {
+    if (!confirm(`⚠️ חריגת תפוסה!\n\nנוכחים כרגע: ${_ac} מתוך ${S.maxCapacity}\nמבקשים להיכנס: ${reg.name} (${_gs} משתתפים)\n\nלאשר כניסה בחריגה?`)) return;
+  }
 
   // Ask for actual participant count if group > 1
   const regParticipants = reg.participants || 1;
@@ -2399,7 +2403,8 @@ function doCodeCheckin() {
   // Sync checkin to server
   if (apiToken) {
     (async () => {
-      try { await api('POST', '/events/' + activeEventId + '/checkin', { code: input, type: 'preregistered' }); } catch(e) {}
+      const _overrideQ = _ac + actualCount > S.maxCapacity ? '?override=1' : '';
+        try { await api('POST', '/events/' + activeEventId + '/checkin' + _overrideQ, { code: input, type: 'preregistered' }); } catch(e) {}
     })();
   }
   document.getElementById('ciCode').value = '';
@@ -3145,19 +3150,22 @@ function adminCheckin(code) {
   if (S.startTime && Date.now() < S.startTime - 30 * 60000) { showError('האירוע טרם התחיל — כניסה תתאפשר מ-' + formatHM(S.startTime)); return; }
   const ac = activeCount();
   const gs = r.participants || 1;
-  if (ac + gs > S.maxCapacity) { showError('האירוע מלא — אין מקום ל-' + gs + ' משתתפים'); return; }
+  if (ac + gs > S.maxCapacity) {
+    if (!confirm(`⚠️ חריגת תפוסה!\n\nנוכחים כרגע: ${ac} מתוך ${S.maxCapacity}\nמבקשים להיכנס: ${r.name} (${gs} משתתפים)\n\nלאשר כניסה בחריגה?`)) return;
+  }
   r.arrived = true;
   const id = randomId();
   const now = Date.now();
   S.guests[id] = { id, name: r.name, checkinTime: now, checkoutTime: null, type: 'preregistered', regCode: code, slotIndex: r.slotIndex, groupSize: gs };
   save();
   if (apiToken) {
-    fetch('/api/events/' + activeEventId + '/checkin', {
+    const _ovrQ = ac + gs > S.maxCapacity ? '?override=1' : '';
+    fetch('/api/events/' + activeEventId + '/checkin' + _ovrQ, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': apiToken },
       body: JSON.stringify({ code, type: 'preregistered' })
     }).catch(() => {});
   }
-  showSuccess(`${r.name} נכנס/ה לאירוע (${gs} משתתפים)`);
+  showSuccess(`${r.name} נכנס/ה לאירוע (${gs} משתתפים)${ac + gs > S.maxCapacity ? ' ⚠️ חריגה' : ''}`);
   renderAll();
 }
 

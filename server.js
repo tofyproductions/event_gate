@@ -414,7 +414,9 @@ app.post('/api/events/:id/checkin', requireAdmin, (req, res) => {
 
   const actualGroup = Math.max(1, Math.min(reg.participants || 1, parseInt(groupSize) || reg.participants || 1));
   const ac = activeCount(ev);
-  if (ac + actualGroup > ev.maxCapacity) return res.status(400).json({ error: 'האירוע מלא' });
+  if (ac + actualGroup > ev.maxCapacity && !req.query.override) {
+    return res.status(400).json({ error: 'האירוע מלא', currentCount: ac, max: ev.maxCapacity, canOverride: true });
+  }
 
   reg.arrived = true;
   reg.actualParticipants = actualGroup;
