@@ -3,307 +3,377 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta http-equiv="refresh" content="30">
-  <title>מצב האירוע - צפייה בלבד</title>
+  <title>לייב - מצב האירוע</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --green: #22c55e;
-      --yellow: #eab308;
-      --orange: #f97316;
-      --red: #ef4444;
-      --blue: #3b82f6;
-      --bg: #0f172a;
-      --card: #1e293b;
-      --text: #f1f5f9;
-      --muted: #94a3b8;
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --green:#22c55e;--yellow:#eab308;--orange:#f97316;--red:#ef4444;
+      --blue:#3b82f6;--purple:#a855f7;
+      --bg:#0a0f1a;--card:#131b2e;--card2:#1a2540;--text:#f1f5f9;--muted:#7a8ba8;
+      --border:#1e2d4a;--glow:rgba(59,130,246,.12);
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100dvh;
-    }
-    .header {
-      background: var(--card);
-      padding: 16px 20px;
-      text-align: center;
-      border-bottom: 1px solid #334155;
-    }
-    .header h1 { font-size: 1.2rem; }
-    .header .live-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      background: var(--green);
-      border-radius: 50%;
-      margin-left: 8px;
-      animation: blink 1.5s infinite;
-    }
-    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-    .header .sub { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
-
-    /* Counter */
-    .counter-section {
-      padding: 30px 20px 20px;
-      text-align: center;
-    }
-    .counter-ring {
-      width: 200px;
-      height: 200px;
-      margin: 0 auto 16px;
-      position: relative;
-    }
-    .counter-ring svg {
-      width: 100%;
-      height: 100%;
-      transform: rotate(-90deg);
-    }
-    .counter-ring .bg-circle {
-      fill: none;
-      stroke: #334155;
-      stroke-width: 12;
-    }
-    .counter-ring .progress-circle {
-      fill: none;
-      stroke-width: 12;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
-    }
-    .counter-inner {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-    }
-    .counter-number {
-      font-size: 3.5rem;
-      font-weight: 800;
-      line-height: 1;
-      transition: color 0.3s;
-    }
-    .counter-label {
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-    .counter-max {
-      font-size: 1rem;
-      color: var(--muted);
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100dvh;
+      background-image:radial-gradient(ellipse at 50% 0%,rgba(59,130,246,.06) 0%,transparent 60%);
     }
 
-    /* Status */
-    .status-bar {
-      text-align: center;
-      padding: 12px 20px;
-      font-size: 1rem;
-      font-weight: 600;
-      border-radius: 12px;
-      margin: 0 20px 20px;
+    /* Header */
+    .header{
+      padding:20px 24px 16px;text-align:center;position:relative;
+      background:linear-gradient(180deg,rgba(59,130,246,.04) 0%,transparent 100%);
     }
-    .status-ok { background: rgba(34,197,94,0.12); color: var(--green); }
-    .status-warn { background: rgba(234,179,8,0.12); color: var(--yellow); }
-    .status-danger { background: rgba(249,115,22,0.12); color: var(--orange); }
-    .status-full { background: rgba(239,68,68,0.15); color: var(--red); animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+    .header-badge{
+      display:inline-flex;align-items:center;gap:6px;
+      background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);
+      border-radius:20px;padding:4px 14px 4px 10px;font-size:.7rem;font-weight:600;
+      color:var(--green);margin-bottom:10px;
+    }
+    .live-pulse{
+      width:8px;height:8px;background:var(--green);border-radius:50%;
+      animation:livePulse 2s infinite;position:relative;
+    }
+    .live-pulse::after{
+      content:'';position:absolute;inset:-3px;border-radius:50%;
+      border:2px solid var(--green);animation:liveRing 2s infinite;
+    }
+    @keyframes livePulse{0%,100%{opacity:1}50%{opacity:.4}}
+    @keyframes liveRing{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.8);opacity:0}}
+    .event-title{font-size:1.4rem;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+    .event-meta{font-size:.8rem;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+    .event-meta .sep{color:var(--border)}
 
-    /* Slots */
-    .slots-section {
-      padding: 0 20px 20px;
+    /* Main Counter */
+    .counter-wrap{padding:24px 20px 16px;display:flex;justify-content:center}
+    .counter-ring{width:220px;height:220px;position:relative}
+    .counter-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+    .counter-ring .track{fill:none;stroke:var(--border);stroke-width:10}
+    .counter-ring .progress{
+      fill:none;stroke-width:10;stroke-linecap:round;
+      transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1),stroke .5s;
+      filter:drop-shadow(0 0 8px currentColor);
     }
-    .slots-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin-bottom: 10px;
+    .counter-inner{
+      position:absolute;inset:0;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
     }
-    .slot-row {
-      background: var(--card);
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-right: 3px solid var(--blue);
+    .counter-num{
+      font-size:4rem;font-weight:900;line-height:1;letter-spacing:-2px;
+      transition:color .5s;
     }
-    .slot-row.active { border-color: var(--green); background: rgba(34,197,94,0.05); }
-    .slot-row.past { opacity: 0.4; }
-    .slot-time { font-weight: 600; font-size: 0.9rem; direction: ltr; }
-    .slot-num { font-size: 0.75rem; color: var(--muted); }
-    .slot-count { font-size: 0.85rem; color: var(--muted); }
-    .slot-active-tag {
-      font-size: 0.65rem;
-      padding: 2px 6px;
-      border-radius: 6px;
-      background: rgba(34,197,94,0.15);
-      color: var(--green);
-      font-weight: 600;
-      margin-right: 6px;
-    }
+    .counter-label{font-size:.75rem;color:var(--muted);margin-top:4px;font-weight:500}
+    .counter-max{font-size:.85rem;color:var(--muted);font-weight:600}
 
-    /* Bar */
-    .slot-bar {
-      width: 100%;
-      height: 4px;
-      background: #334155;
-      border-radius: 2px;
-      margin-top: 6px;
-      overflow: hidden;
+    /* Status Pill */
+    .status-pill{
+      margin:0 20px 20px;padding:14px 20px;border-radius:14px;text-align:center;
+      font-weight:700;font-size:1rem;transition:all .5s;
+      border:1px solid transparent;
     }
-    .slot-bar-fill {
-      height: 100%;
-      border-radius: 2px;
-      transition: width 0.5s;
-    }
+    .status-ok{background:rgba(34,197,94,.08);color:var(--green);border-color:rgba(34,197,94,.15)}
+    .status-warn{background:rgba(234,179,8,.08);color:var(--yellow);border-color:rgba(234,179,8,.15)}
+    .status-danger{background:rgba(249,115,22,.08);color:var(--orange);border-color:rgba(249,115,22,.15);animation:statusPulse 2s infinite}
+    .status-full{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.2);animation:statusPulse 1.5s infinite}
+    @keyframes statusPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.85;transform:scale(1.01)}}
 
-    .not-configured {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--muted);
+    /* Stats Row */
+    .stats-row{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+      padding:0 20px 16px;
     }
-    .not-configured .icon { font-size: 3rem; margin-bottom: 12px; }
+    .stat-card{
+      background:var(--card);border:1px solid var(--border);border-radius:14px;
+      padding:14px 10px;text-align:center;position:relative;overflow:hidden;
+    }
+    .stat-card::before{
+      content:'';position:absolute;top:0;left:0;right:0;height:2px;
+      background:var(--stat-accent,var(--blue));opacity:.6;
+    }
+    .stat-val{font-size:1.6rem;font-weight:800;line-height:1.1}
+    .stat-lbl{font-size:.6rem;color:var(--muted);margin-top:4px;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+
+    /* Active Slot Banner */
+    .slot-banner{
+      margin:0 20px 16px;padding:12px 16px;border-radius:12px;
+      display:flex;align-items:center;gap:10px;font-size:.85rem;
+      background:var(--card);border:1px solid var(--border);
+    }
+    .slot-banner-icon{font-size:1.2rem}
+    .slot-banner-text{flex:1;font-weight:600}
+    .slot-banner-time{font-size:.75rem;color:var(--muted);direction:ltr}
+
+    /* Slots Grid */
+    .slots-section{padding:0 20px 24px}
+    .section-label{
+      font-size:.75rem;font-weight:600;color:var(--muted);margin-bottom:10px;
+      text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px;
+    }
+    .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    .slot-card{
+      background:var(--card);border:1px solid var(--border);border-radius:12px;
+      padding:12px 14px;margin-bottom:6px;transition:all .3s;
+    }
+    .slot-card.active{
+      border-color:rgba(34,197,94,.3);background:linear-gradient(135deg,rgba(34,197,94,.06),rgba(34,197,94,.02));
+      box-shadow:0 0 20px rgba(34,197,94,.08);
+    }
+    .slot-card.past{opacity:.35}
+    .slot-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .slot-name{display:flex;align-items:center;gap:8px}
+    .slot-time-text{font-weight:700;font-size:.9rem;direction:ltr}
+    .slot-num-text{font-size:.7rem;color:var(--muted)}
+    .now-tag{
+      font-size:.55rem;padding:2px 8px;border-radius:6px;font-weight:700;
+      background:rgba(34,197,94,.15);color:var(--green);
+    }
+    .slot-count-text{font-size:.85rem;font-weight:700;font-variant-numeric:tabular-nums}
+    .slot-bar{height:4px;background:var(--border);border-radius:3px;overflow:hidden}
+    .slot-bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+    /* Not configured */
+    .empty-state{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      min-height:60vh;text-align:center;padding:40px;
+    }
+    .empty-icon{font-size:4rem;margin-bottom:16px;opacity:.5}
+    .empty-title{font-size:1.2rem;font-weight:700;margin-bottom:6px}
+    .empty-sub{font-size:.85rem;color:var(--muted)}
+
+    /* Footer */
+    .footer{
+      text-align:center;padding:16px 20px 24px;font-size:.65rem;color:var(--muted);
+    }
+    .footer a{color:var(--blue);text-decoration:none}
+
+    /* Animations */
+    .fade-in{animation:fadeIn .5s ease-out}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .num-change{animation:numPop .4s ease-out}
+    @keyframes numPop{0%{transform:scale(1)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>מצב האירוע <span class="live-dot"></span></h1>
-    <div class="sub">צפייה בלבד — מתעדכן בזמן אמת</div>
+
+<div id="liveApp">
+  <!-- Empty state -->
+  <div id="emptyState" class="empty-state" style="display:none">
+    <div class="empty-icon">📡</div>
+    <div class="empty-title">אין אירועים פעילים כרגע</div>
+    <div class="empty-sub">העמוד יתעדכן אוטומטית כשיתחיל אירוע</div>
   </div>
 
-  <div id="notConfigured" class="not-configured" style="display:none;">
-    <div class="icon">🔧</div>
-    <div>האירוע טרם הוגדר</div>
-  </div>
+  <!-- Main content -->
+  <div id="mainContent" style="display:none">
+    <div class="header">
+      <div class="header-badge"><div class="live-pulse"></div> שידור חי</div>
+      <div class="event-title" id="evTitle"></div>
+      <div class="event-meta">
+        <span id="evDate"></span>
+        <span class="sep">|</span>
+        <span id="evTime" style="direction:ltr"></span>
+        <span id="evAddress" style="display:none"><span class="sep">|</span> <span id="evAddrText"></span></span>
+      </div>
+    </div>
 
-  <div id="mainContent">
-    <div class="counter-section">
+    <div class="counter-wrap">
       <div class="counter-ring">
-        <svg viewBox="0 0 200 200">
-          <circle class="bg-circle" cx="100" cy="100" r="88" />
-          <circle class="progress-circle" id="progressCircle" cx="100" cy="100" r="88" />
+        <svg viewBox="0 0 220 220">
+          <circle class="track" cx="110" cy="110" r="96" />
+          <circle class="progress" id="progressCircle" cx="110" cy="110" r="96" />
         </svg>
         <div class="counter-inner">
-          <div class="counter-number" id="currentCount">0</div>
+          <div class="counter-num" id="countNum">0</div>
           <div class="counter-label">נוכחים כרגע</div>
-          <div class="counter-max">מתוך <span id="maxCap">50</span></div>
+          <div class="counter-max">מתוך <strong id="maxNum">0</strong></div>
         </div>
       </div>
     </div>
 
-    <div class="status-bar status-ok" id="statusBar">ממתין לאורחים</div>
+    <div class="status-pill status-ok" id="statusPill">ממתין לאורחים</div>
+
+    <div class="stats-row">
+      <div class="stat-card" style="--stat-accent:var(--blue)">
+        <div class="stat-val" id="statRegs" style="color:var(--blue)">0</div>
+        <div class="stat-lbl">נרשמו מראש</div>
+      </div>
+      <div class="stat-card" style="--stat-accent:var(--green)">
+        <div class="stat-val" id="statVisited" style="color:var(--green)">0</div>
+        <div class="stat-lbl">סה"כ ביקרו</div>
+      </div>
+      <div class="stat-card" style="--stat-accent:var(--purple)">
+        <div class="stat-val" id="statWalkins" style="color:var(--purple)">0</div>
+        <div class="stat-lbl">מזדמנים</div>
+      </div>
+    </div>
+
+    <div id="slotBanner" class="slot-banner" style="display:none">
+      <div class="slot-banner-icon" id="bannerIcon">🟢</div>
+      <div class="slot-banner-text" id="bannerText"></div>
+      <div class="slot-banner-time" id="bannerTime"></div>
+    </div>
 
     <div class="slots-section">
-      <div class="slots-title">סבבים</div>
+      <div class="section-label">סבבים</div>
       <div id="slotsList"></div>
     </div>
+
+    <div class="footer">
+      מתעדכן אוטומטית כל 3 שניות &middot; <span>🌈 חברים של טופי בע״מ</span>
+    </div>
   </div>
+</div>
 
-  <script>
-    const circumference = 2 * Math.PI * 88;
+<script>
+const circ = 2 * Math.PI * 96;
+let prevCount = -1;
+let reconnectDelay = 1000;
 
-    function connectSSE() {
-      const evtSource = new EventSource('/api/events/public');
-      evtSource.onmessage = (e) => {
-        try {
-          const state = JSON.parse(e.data);
-          render(state);
-        } catch {}
-      };
-      evtSource.onerror = () => {
-        evtSource.close();
-        setTimeout(connectSSE, 3000);
-      };
+function connectSSE() {
+  const src = new EventSource('/api/events/public');
+  src.onopen = () => { reconnectDelay = 1000; };
+  src.onmessage = (e) => {
+    try { render(JSON.parse(e.data)); } catch(err) { console.error('Parse error:', err); }
+  };
+  src.onerror = () => {
+    src.close();
+    setTimeout(connectSSE, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
+  };
+}
+connectSSE();
+
+function render(state) {
+  if (!state.configured) {
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+    return;
+  }
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+
+  // Event info
+  const title = state.eventName ? state.eventName + ' — ' + state.clientName : (state.clientName || 'אירוע');
+  document.getElementById('evTitle').textContent = title;
+  if (state.date) {
+    const d = new Date(state.startTime || state.date);
+    document.getElementById('evDate').textContent = d.toLocaleDateString('he-IL', {weekday:'long', day:'numeric', month:'long'});
+  }
+  // Time range from slots
+  const slots = state.slotStats || [];
+  if (slots.length > 0) {
+    const first = slots[0].label.split(' - ')[0];
+    const last = slots[slots.length-1].label.split(' - ')[1];
+    document.getElementById('evTime').textContent = first + ' - ' + last;
+  }
+  if (state.eventAddress) {
+    document.getElementById('evAddress').style.display = '';
+    document.getElementById('evAddrText').textContent = '📍 ' + state.eventAddress;
+  }
+
+  // Counter
+  const count = state.currentCount || 0;
+  const max = state.maxCapacity || 50;
+  const pct = count / max;
+
+  let color;
+  if (pct >= 1) color = 'var(--red)';
+  else if (pct >= .9) color = 'var(--orange)';
+  else if (pct >= .7) color = 'var(--yellow)';
+  else color = 'var(--green)';
+
+  const circle = document.getElementById('progressCircle');
+  circle.style.strokeDasharray = circ;
+  circle.style.strokeDashoffset = circ - (Math.min(pct, 1) * circ);
+  circle.style.stroke = color;
+
+  const numEl = document.getElementById('countNum');
+  numEl.textContent = count;
+  numEl.style.color = color;
+  if (prevCount !== count && prevCount >= 0) numEl.classList.add('num-change');
+  setTimeout(() => numEl.classList.remove('num-change'), 500);
+  prevCount = count;
+  document.getElementById('maxNum').textContent = max;
+
+  // Status
+  const pill = document.getElementById('statusPill');
+  const rem = max - count;
+  pill.className = 'status-pill';
+  if (count >= max) { pill.classList.add('status-full'); pill.textContent = '⛔ האירוע מלא כרגע'; }
+  else if (pct >= .9) { pill.classList.add('status-danger'); pill.textContent = `🔥 נותרו ${rem} מקומות בלבד!`; }
+  else if (pct >= .7) { pill.classList.add('status-warn'); pill.textContent = `⚡ נותרו ${rem} מקומות`; }
+  else if (count === 0) { pill.classList.add('status-ok'); pill.textContent = '✨ ממתין לאורחים'; }
+  else { pill.classList.add('status-ok'); pill.textContent = `✅ ${rem} מקומות פנויים`; }
+
+  // Stats
+  document.getElementById('statRegs').textContent = state.totalRegs || 0;
+  document.getElementById('statVisited').textContent = state.totalGuests || 0;
+  document.getElementById('statWalkins').textContent = state.walkins || 0;
+
+  // Slot banner
+  const banner = document.getElementById('slotBanner');
+  const now = Date.now();
+  if (slots.length > 0) {
+    const current = slots.find(s => now >= s.startTime && now < s.endTime);
+    const next = slots.find(s => now < s.startTime);
+    const allDone = slots.every(s => now >= s.endTime);
+
+    banner.style.display = 'flex';
+    if (current) {
+      document.getElementById('bannerIcon').textContent = '🟢';
+      document.getElementById('bannerText').textContent = `סבב ${current.index + 1} פעיל כרגע`;
+      document.getElementById('bannerTime').textContent = current.label;
+      banner.style.borderColor = 'rgba(34,197,94,.2)';
+    } else if (next) {
+      const mins = Math.ceil((next.startTime - now) / 60000);
+      document.getElementById('bannerIcon').textContent = '🔵';
+      document.getElementById('bannerText').textContent = `סבב ${next.index + 1} מתחיל בעוד ${mins} דק'`;
+      document.getElementById('bannerTime').textContent = next.label;
+      banner.style.borderColor = 'rgba(59,130,246,.2)';
+    } else if (allDone) {
+      document.getElementById('bannerIcon').textContent = '🏁';
+      document.getElementById('bannerText').textContent = 'כל הסבבים הסתיימו';
+      document.getElementById('bannerTime').textContent = '';
+      banner.style.borderColor = 'var(--border)';
     }
-    connectSSE();
+  }
 
-    function render(state) {
-      if (!state.configured) {
-        document.getElementById('notConfigured').style.display = 'block';
-        document.getElementById('mainContent').style.display = 'none';
-        return;
-      }
-      document.getElementById('notConfigured').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
+  // Slots list
+  const list = document.getElementById('slotsList');
+  if (slots.length > 0) {
+    list.innerHTML = slots.map(s => {
+      const isCurrent = now >= s.startTime && now < s.endTime;
+      const isPast = now >= s.endTime;
+      const cls = isCurrent ? 'active' : isPast ? 'past' : '';
+      const regPct = Math.min((s.registered / max) * 100, 100);
+      let barColor = 'var(--green)';
+      if (regPct >= 90) barColor = 'var(--red)';
+      else if (regPct >= 70) barColor = 'var(--yellow)';
+      else if (regPct >= 50) barColor = 'var(--blue)';
 
-      const pct = state.currentCount / state.maxCapacity;
-      const offset = circumference - (pct * circumference);
-
-      const circle = document.getElementById('progressCircle');
-      circle.style.strokeDasharray = circumference;
-      circle.style.strokeDashoffset = offset;
-
-      let color;
-      if (pct >= 1) color = 'var(--red)';
-      else if (pct >= 0.9) color = 'var(--orange)';
-      else if (pct >= 0.7) color = 'var(--yellow)';
-      else color = 'var(--green)';
-
-      circle.style.stroke = color;
-      const counterEl = document.getElementById('currentCount');
-      counterEl.textContent = state.currentCount;
-      counterEl.style.color = color;
-      document.getElementById('maxCap').textContent = state.maxCapacity;
-
-      // Status
-      const statusBar = document.getElementById('statusBar');
-      const remaining = state.maxCapacity - state.currentCount;
-      statusBar.className = 'status-bar';
-      if (state.currentCount >= state.maxCapacity) {
-        statusBar.classList.add('status-full');
-        statusBar.textContent = 'האירוע מלא כרגע';
-      } else if (pct >= 0.9) {
-        statusBar.classList.add('status-danger');
-        statusBar.textContent = `נותרו ${remaining} מקומות בלבד!`;
-      } else if (pct >= 0.7) {
-        statusBar.classList.add('status-warn');
-        statusBar.textContent = `נותרו ${remaining} מקומות`;
-      } else if (state.currentCount === 0) {
-        statusBar.classList.add('status-ok');
-        statusBar.textContent = 'ממתין לאורחים';
-      } else {
-        statusBar.classList.add('status-ok');
-        statusBar.textContent = `${remaining} מקומות פנויים`;
-      }
-
-      // Slots
-      const slots = state.slotStats || [];
-      const now = Date.now();
-      const list = document.getElementById('slotsList');
-
-      if (slots.length === 0) {
-        list.innerHTML = '';
-        return;
-      }
-
-      list.innerHTML = slots.map(slot => {
-        const isCurrent = state.currentSlotIndex === slot.index;
-        const isPast = now >= slot.endTime;
-        let cls = '';
-        if (isCurrent) cls = 'active';
-        else if (isPast) cls = 'past';
-
-        const regPct = Math.min((slot.registered / state.maxCapacity) * 100, 100);
-        let barColor = 'var(--green)';
-        if (regPct >= 90) barColor = 'var(--red)';
-        else if (regPct >= 70) barColor = 'var(--yellow)';
-
-        return `
-          <div class="slot-row ${cls}">
-            <div style="flex:1">
-              <div>
-                <span class="slot-time">${slot.label}</span>
-                <span class="slot-num">סבב ${slot.index + 1}</span>
-                ${isCurrent ? '<span class="slot-active-tag">עכשיו</span>' : ''}
-              </div>
-              <div class="slot-bar">
-                <div class="slot-bar-fill" style="width:${regPct}%; background:${barColor}"></div>
-              </div>
-            </div>
-            <span class="slot-count">${slot.registered}/${state.maxCapacity}</span>
+      return `<div class="slot-card ${cls}">
+        <div class="slot-top">
+          <div class="slot-name">
+            <span class="slot-time-text">${s.label}</span>
+            <span class="slot-num-text">סבב ${s.index + 1}</span>
+            ${isCurrent ? '<span class="now-tag">עכשיו</span>' : ''}
           </div>
-        `;
-      }).join('');
-    }
-  </script>
+          <span class="slot-count-text" style="color:${regPct >= 90 ? 'var(--red)' : regPct >= 70 ? 'var(--yellow)' : 'var(--muted)'}">
+            ${s.registered}/${max}
+          </span>
+        </div>
+        <div class="slot-bar">
+          <div class="slot-bar-fill" style="width:${regPct}%;background:${barColor}"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// Update page title with count
+setInterval(() => {
+  if (prevCount >= 0) document.title = `(${prevCount}) לייב - מצב האירוע`;
+}, 5000);
+</script>
 </body>
 </html>

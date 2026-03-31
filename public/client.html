@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>לוח בקרה - לקוח</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --green:#22c55e;--yellow:#eab308;--orange:#f97316;--red:#ef4444;
+      --blue:#3b82f6;--purple:#a855f7;--pink:#ec4899;--cyan:#06b6d4;
+      --bg:#0a0f1a;--card:#131b2e;--card2:#1a2540;--text:#f1f5f9;--muted:#7a8ba8;
+      --border:#1e2d4a;
+    }
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:var(--bg);color:var(--text);min-height:100dvh;
+      background-image:radial-gradient(ellipse at 50% 0%,rgba(59,130,246,.05) 0%,transparent 50%);
+    }
+
+    /* === Header === */
+    .top-bar{
+      padding:20px 24px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid var(--border);background:rgba(19,27,46,.8);
+      backdrop-filter:blur(12px);position:sticky;top:0;z-index:10;
+    }
+    .logo-area{display:flex;align-items:center;gap:10px}
+    .logo-text{font-weight:800;font-size:1rem}
+    .logo-sub{font-size:.65rem;color:var(--muted)}
+    .client-name{
+      font-size:.8rem;padding:6px 14px;border-radius:10px;
+      background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.15);
+      color:var(--blue);font-weight:600;
+    }
+
+    /* === Auth Screen === */
+    .auth-screen{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      min-height:80vh;padding:40px 24px;text-align:center;
+    }
+    .auth-icon{font-size:4rem;margin-bottom:20px}
+    .auth-title{font-size:1.4rem;font-weight:800;margin-bottom:8px}
+    .auth-sub{font-size:.9rem;color:var(--muted);margin-bottom:24px;line-height:1.6}
+    .auth-input{
+      width:100%;max-width:340px;padding:16px 20px;background:var(--card);
+      border:2px solid var(--border);border-radius:14px;color:var(--text);
+      font-size:1.1rem;text-align:center;direction:ltr;outline:none;
+      transition:border-color .2s;font-family:inherit;
+    }
+    .auth-input:focus{border-color:var(--blue)}
+    .auth-btn{
+      width:100%;max-width:340px;padding:16px;border:none;border-radius:14px;
+      background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;
+      font-size:1.05rem;font-weight:700;cursor:pointer;margin-top:12px;
+      transition:transform .1s;font-family:inherit;
+    }
+    .auth-btn:active{transform:scale(.97)}
+    .auth-btn:disabled{opacity:.5;cursor:not-allowed}
+    .auth-error{color:var(--red);font-size:.85rem;margin-top:12px;min-height:1.2em}
+
+    /* === Dashboard === */
+    .dashboard{display:none;padding:20px;padding-bottom:40px}
+
+    /* Tabs */
+    .tabs{
+      display:flex;gap:4px;margin-bottom:20px;background:var(--card);
+      border-radius:14px;padding:4px;border:1px solid var(--border);
+    }
+    .tab{
+      flex:1;padding:10px 8px;border:none;border-radius:10px;
+      background:none;color:var(--muted);font-size:.8rem;font-weight:600;
+      cursor:pointer;transition:all .2s;font-family:inherit;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .tab.active{background:rgba(59,130,246,.12);color:var(--blue)}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+
+    /* Event Selector */
+    .event-pills{
+      display:flex;gap:6px;overflow-x:auto;padding:0 0 12px;
+      -webkit-overflow-scrolling:touch;scrollbar-width:none;
+    }
+    .event-pills::-webkit-scrollbar{display:none}
+    .ev-pill{
+      flex:none;padding:8px 16px;border-radius:10px;font-size:.75rem;
+      font-weight:600;cursor:pointer;white-space:nowrap;
+      background:var(--card);border:1px solid var(--border);color:var(--muted);
+      transition:all .2s;font-family:inherit;
+    }
+    .ev-pill.active{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:var(--blue)}
+    .ev-pill .pill-date{font-size:.6rem;display:block;margin-top:2px;color:var(--muted)}
+
+    /* KPI Cards */
+    .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+    @media(min-width:500px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(min-width:700px){.kpi-grid{grid-template-columns:repeat(4,1fr)}}
+    .kpi{
+      background:var(--card);border:1px solid var(--border);border-radius:14px;
+      padding:16px 12px;position:relative;overflow:hidden;
+    }
+    .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kpi-color,var(--blue));opacity:.6}
+    .kpi-icon{font-size:1.4rem;margin-bottom:8px}
+    .kpi-val{font-size:1.8rem;font-weight:800;line-height:1;color:var(--kpi-color,var(--blue))}
+    .kpi-label{font-size:.65rem;color:var(--muted);margin-top:4px;font-weight:500}
+    .kpi-change{font-size:.6rem;margin-top:4px;font-weight:600}
+    .kpi-up{color:var(--green)}
+    .kpi-down{color:var(--red)}
+
+    /* Section */
+    .section{margin-bottom:20px}
+    .section-title{
+      font-size:.8rem;font-weight:700;color:var(--muted);margin-bottom:10px;
+      text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px;
+    }
+    .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    /* Chart placeholder */
+    .chart-card{
+      background:var(--card);border:1px solid var(--border);border-radius:14px;
+      padding:16px;margin-bottom:12px;
+    }
+    .chart-title{font-size:.85rem;font-weight:700;margin-bottom:12px}
+    .bar-chart{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:8px}
+    .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+    .bar{
+      width:100%;min-height:4px;border-radius:4px 4px 0 0;transition:height .5s;
+      position:relative;
+    }
+    .bar-val{font-size:.55rem;font-weight:700;position:absolute;top:-14px;width:100%;text-align:center}
+    .bar-label{font-size:.5rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:center}
+
+    /* Comparison Table */
+    .cmp-table{width:100%;border-collapse:collapse;font-size:.75rem}
+    .cmp-table th{
+      text-align:right;padding:8px 10px;color:var(--muted);font-weight:600;
+      border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;
+    }
+    .cmp-table td{
+      padding:10px;border-bottom:1px solid rgba(30,45,74,.5);
+      vertical-align:middle;
+    }
+    .cmp-table tr:hover td{background:rgba(59,130,246,.03)}
+    .cmp-current{background:rgba(59,130,246,.05)}
+    .rate-bar{
+      display:inline-flex;align-items:center;gap:6px;
+    }
+    .rate-track{width:50px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+    .rate-fill{height:100%;border-radius:2px}
+
+    /* Slot Heatmap */
+    .heatmap{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:4px}
+    .heat-cell{
+      padding:10px 6px;border-radius:8px;text-align:center;font-size:.65rem;
+      border:1px solid transparent;
+    }
+    .heat-cell .h-val{font-size:1rem;font-weight:800;margin-bottom:2px}
+    .heat-cell .h-lbl{color:var(--muted);font-size:.55rem}
+
+    /* Insights */
+    .insight-card{
+      background:linear-gradient(135deg,rgba(59,130,246,.06),rgba(168,85,247,.04));
+      border:1px solid rgba(59,130,246,.12);border-radius:14px;
+      padding:16px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;
+    }
+    .insight-icon{font-size:1.3rem;flex:none}
+    .insight-text{flex:1}
+    .insight-title{font-size:.85rem;font-weight:700;margin-bottom:2px}
+    .insight-sub{font-size:.75rem;color:var(--muted);line-height:1.5}
+
+    /* Loading */
+    .loading{text-align:center;padding:40px;color:var(--muted)}
+    .spinner{
+      width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--blue);
+      border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Filter row */
+    .filter-row{
+      display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;
+    }
+    .filter-btn{
+      padding:6px 14px;border-radius:8px;font-size:.7rem;font-weight:600;
+      border:1px solid var(--border);background:var(--card);color:var(--muted);
+      cursor:pointer;font-family:inherit;transition:all .2s;
+    }
+    .filter-btn.active{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:var(--blue)}
+  </style>
+</head>
+<body>
+
+<!-- Auth Screen -->
+<div id="authScreen" class="auth-screen">
+  <div class="auth-icon">📊</div>
+  <div class="auth-title">לוח בקרה ללקוח</div>
+  <div class="auth-sub">הזינו את מספר הטלפון שלכם<br>כדי לצפות בנתוני האירועים</div>
+  <input type="tel" class="auth-input" id="authPhone" placeholder="050-1234567" onkeydown="if(event.key==='Enter')doAuth()" />
+  <button class="auth-btn" id="authBtn" onclick="doAuth()">כניסה</button>
+  <div class="auth-error" id="authError"></div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboardScreen" class="dashboard">
+  <div class="top-bar">
+    <div class="logo-area">
+      <div>
+        <div class="logo-text">📊 לוח בקרה</div>
+        <div class="logo-sub">ניתוח אירועים מתקדם</div>
+      </div>
+    </div>
+    <div class="client-name" id="clientNameBadge"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div style="padding:16px 0 0">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('live')">🔴 לייב</button>
+      <button class="tab" onclick="switchTab('analytics')">📈 ניתוח</button>
+      <button class="tab" onclick="switchTab('compare')">⚖️ השוואה</button>
+      <button class="tab" onclick="switchTab('insights')">💡 תובנות</button>
+    </div>
+  </div>
+
+  <!-- TAB: Live -->
+  <div class="tab-panel active" id="tab-live">
+    <div id="liveContent"></div>
+  </div>
+
+  <!-- TAB: Analytics -->
+  <div class="tab-panel" id="tab-analytics">
+    <div id="analyticsContent"></div>
+  </div>
+
+  <!-- TAB: Compare -->
+  <div class="tab-panel" id="tab-compare">
+    <div id="compareContent"></div>
+  </div>
+
+  <!-- TAB: Insights -->
+  <div class="tab-panel" id="tab-insights">
+    <div id="insightsContent"></div>
+  </div>
+</div>
+
+<script>
+let clientData = null;
+let selectedEventIdx = 0;
+let compareFilter = 'all'; // all, year, location
+
+// === AUTH ===
+async function doAuth() {
+  const phone = document.getElementById('authPhone').value.trim();
+  const err = document.getElementById('authError');
+  const btn = document.getElementById('authBtn');
+  if (!phone) { err.textContent = 'נא להזין מספר טלפון'; return; }
+  btn.disabled = true; btn.textContent = 'מתחבר...';
+  err.textContent = '';
+  try {
+    const res = await fetch('/api/client-auth', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error || 'שגיאה'; return; }
+    clientData = data;
+    // Find the token from first event
+    if (data.events.length > 0) {
+      const token = data.events[0].clientToken;
+      // Fetch full analytics
+      const aRes = await fetch('/api/client/' + token + '/analytics');
+      if (aRes.ok) {
+        const analytics = await aRes.json();
+        clientData = { ...clientData, ...analytics };
+      }
+    }
+    showDashboard();
+  } catch(e) {
+    err.textContent = 'שגיאת חיבור';
+  } finally {
+    btn.disabled = false; btn.textContent = 'כניסה';
+  }
+}
+
+// Check URL for token
+(function checkUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  if (token) {
+    (async () => {
+      try {
+        const res = await fetch('/api/client/' + token);
+        if (!res.ok) return;
+        const ev = await res.json();
+        // Fetch analytics
+        const aRes = await fetch('/api/client/' + token + '/analytics');
+        if (aRes.ok) {
+          clientData = await aRes.json();
+        } else {
+          clientData = { events: [ev], client: { name: ev.clientName } };
+        }
+        showDashboard();
+      } catch(e) {}
+    })();
+  }
+})();
+
+function showDashboard() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('dashboardScreen').style.display = 'block';
+  document.getElementById('clientNameBadge').textContent = clientData.client?.name || '';
+  renderAll();
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', t.textContent.includes({live:'לייב',analytics:'ניתוח',compare:'השוואה',insights:'תובנות'}[name])));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  renderAll();
+}
+
+function renderAll() {
+  renderLive();
+  renderAnalytics();
+  renderCompare();
+  renderInsights();
+}
+
+// === LIVE TAB ===
+function renderLive() {
+  const el = document.getElementById('liveContent');
+  const events = clientData.events || [];
+  const now = Date.now();
+
+  // Find active events (happening now or today)
+  const today = new Date().toISOString().split('T')[0];
+  const activeEvents = events.filter(ev => {
+    if (!ev.startTime) return ev.date === today;
+    const slots = ev.slots || [];
+    if (slots.length === 0) return false;
+    const first = slots[0].startTime;
+    const last = slots[slots.length-1].endTime;
+    return now >= first - 30*60000 && now <= last + 60*60000;
+  });
+
+  if (activeEvents.length === 0) {
+    // No live events - show next upcoming
+    const upcoming = events.filter(e => e.date && e.date >= today).sort((a,b) => (a.startTime||0)-(b.startTime||0));
+    if (upcoming.length > 0) {
+      const next = upcoming[0];
+      const d = new Date(next.startTime || next.date);
+      el.innerHTML = `
+        <div style="text-align:center;padding:40px 20px">
+          <div style="font-size:3rem;margin-bottom:12px">📅</div>
+          <div style="font-size:1.1rem;font-weight:700;margin-bottom:6px">אין אירועים פעילים כרגע</div>
+          <div style="color:var(--muted);font-size:.85rem;margin-bottom:16px">האירוע הבא:</div>
+          <div class="chart-card" style="text-align:right">
+            <div style="font-weight:700;font-size:1rem;margin-bottom:4px">${esc(next.eventName || next.clientName)}</div>
+            <div style="color:var(--blue);font-size:.85rem">${d.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+            <div style="color:var(--muted);font-size:.8rem;margin-top:4px">${next.totalRegs || 0} נרשמו מראש</div>
+          </div>
+        </div>`;
+    } else {
+      el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:3rem;margin-bottom:12px">📡</div>אין אירועים פעילים</div>';
+    }
+    return;
+  }
+
+  let html = '';
+  for (const ev of activeEvents) {
+    const ac = ev.activeCount || 0;
+    const max = ev.maxCapacity || 50;
+    const pct = ac / max;
+    let color = pct >= 1 ? 'var(--red)' : pct >= .9 ? 'var(--orange)' : pct >= .7 ? 'var(--yellow)' : 'var(--green)';
+    const rem = max - ac;
+    const arrivedRate = ev.totalRegs > 0 ? Math.round((ev.arrivedRegs || 0) / ev.totalRegs * 100) : 0;
+
+    html += `
+    <div class="chart-card" style="border-right:3px solid ${color}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <div style="font-weight:700;font-size:1rem">${esc(ev.eventName || ev.clientName)}</div>
+          <div style="color:var(--muted);font-size:.75rem;margin-top:2px">${ev.date || ''}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:2rem;font-weight:900;color:${color}">${ac}</div>
+          <div style="font-size:.6rem;color:var(--muted)">מתוך ${max}</div>
+        </div>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:12px">
+        <div style="height:100%;width:${Math.min(pct*100,100)}%;background:${color};border-radius:3px;transition:width .5s"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:.7rem">
+        <div><div style="font-weight:800;color:var(--blue)">${ev.totalRegs || 0}</div><div style="color:var(--muted);font-size:.55rem">נרשמו</div></div>
+        <div><div style="font-weight:800;color:var(--green)">${ev.arrivedRegs || 0}</div><div style="color:var(--muted);font-size:.55rem">הגיעו</div></div>
+        <div><div style="font-weight:800;color:var(--orange)">${ev.walkins || 0}</div><div style="color:var(--muted);font-size:.55rem">מזדמנים</div></div>
+        <div><div style="font-weight:800;color:var(--purple)">${arrivedRate}%</div><div style="color:var(--muted);font-size:.55rem">הגעה</div></div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// === ANALYTICS TAB ===
+function renderAnalytics() {
+  const el = document.getElementById('analyticsContent');
+  const events = clientData.events || [];
+  if (events.length === 0) { el.innerHTML = '<div class="loading">אין נתונים</div>'; return; }
+
+  // Event selector pills
+  let html = '<div class="event-pills">';
+  events.sort((a,b) => (b.startTime||0) - (a.startTime||0)).forEach((ev, i) => {
+    const active = i === selectedEventIdx ? 'active' : '';
+    html += `<button class="ev-pill ${active}" onclick="selectedEventIdx=${i};renderAnalytics()">
+      ${esc(ev.eventName || ev.clientName)}
+      <span class="pill-date">${ev.date || ''}</span>
+    </button>`;
+  });
+  html += '</div>';
+
+  const ev = events[selectedEventIdx];
+  if (!ev) { el.innerHTML = html; return; }
+
+  const arrivedRate = ev.totalRegs > 0 ? Math.round((ev.arrivedRegs||0) / ev.totalRegs * 100) : 0;
+  const noShows = (ev.totalRegs || 0) - (ev.arrivedRegs || 0);
+
+  // KPIs
+  html += `<div class="kpi-grid">
+    <div class="kpi" style="--kpi-color:var(--blue)"><div class="kpi-icon">📝</div><div class="kpi-val">${ev.totalRegs||0}</div><div class="kpi-label">נרשמו מראש</div></div>
+    <div class="kpi" style="--kpi-color:var(--green)"><div class="kpi-icon">✅</div><div class="kpi-val">${ev.arrivedRegs||0}</div><div class="kpi-label">הגיעו</div></div>
+    <div class="kpi" style="--kpi-color:var(--purple)"><div class="kpi-icon">📊</div><div class="kpi-val">${arrivedRate}%</div><div class="kpi-label">אחוז הגעה</div></div>
+    <div class="kpi" style="--kpi-color:var(--red)"><div class="kpi-icon">❌</div><div class="kpi-val">${noShows}</div><div class="kpi-label">לא הגיעו</div></div>
+    <div class="kpi" style="--kpi-color:var(--orange)"><div class="kpi-icon">🚶</div><div class="kpi-val">${ev.walkins||0}</div><div class="kpi-label">מזדמנים</div></div>
+    <div class="kpi" style="--kpi-color:var(--cyan)"><div class="kpi-icon">👥</div><div class="kpi-val">${ev.totalGuests||0}</div><div class="kpi-label">סה"כ ביקרו</div></div>
+    <div class="kpi" style="--kpi-color:var(--pink)"><div class="kpi-icon">⏱</div><div class="kpi-val">${ev.avgStayMinutes||0}<span style="font-size:.7rem">דק'</span></div><div class="kpi-label">שהייה ממוצעת</div></div>
+    <div class="kpi" style="--kpi-color:var(--yellow)"><div class="kpi-icon">🏆</div><div class="kpi-val">${ev.peakConcurrent||0}</div><div class="kpi-label">שיא נוכחים</div></div>
+  </div>`;
+
+  // Slot Heatmap
+  const slots = ev.slots || [];
+  if (slots.length > 0) {
+    html += `<div class="section"><div class="section-title">מפת חום — סבבים</div><div class="heatmap">`;
+    slots.forEach(s => {
+      const rate = s.regCount > 0 ? Math.round((s.arrivedCount||0) / s.regCount * 100) : 0;
+      const bg = rate >= 80 ? 'rgba(34,197,94,.15)' : rate >= 50 ? 'rgba(234,179,8,.1)' : rate > 0 ? 'rgba(239,68,68,.08)' : 'var(--card)';
+      const borderC = rate >= 80 ? 'rgba(34,197,94,.25)' : rate >= 50 ? 'rgba(234,179,8,.2)' : 'var(--border)';
+      const valColor = rate >= 80 ? 'var(--green)' : rate >= 50 ? 'var(--yellow)' : 'var(--muted)';
+      html += `<div class="heat-cell" style="background:${bg};border-color:${borderC}">
+        <div class="h-val" style="color:${valColor}">${rate}%</div>
+        <div class="h-lbl">סבב ${s.index !== undefined ? s.index+1 : ''}</div>
+        <div class="h-lbl">${s.regCount||0} נרשמו</div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  // Hourly Flow Chart
+  const hourly = ev.hourlyFlow || {};
+  const hours = Object.keys(hourly).sort();
+  if (hours.length > 0) {
+    const maxH = Math.max(...Object.values(hourly), 1);
+    html += `<div class="section"><div class="section-title">זרימת כניסות לפי שעה</div>
+      <div class="chart-card"><div class="bar-chart">`;
+    hours.forEach(h => {
+      const v = hourly[h];
+      const hPct = (v / maxH) * 100;
+      html += `<div class="bar-col">
+        <div class="bar" style="height:${hPct}%;background:linear-gradient(180deg,var(--blue),var(--purple))">
+          <div class="bar-val" style="color:var(--blue)">${v}</div>
+        </div>
+        <div class="bar-label">${h}</div>
+      </div>`;
+    });
+    html += '</div></div></div>';
+  }
+
+  el.innerHTML = html;
+}
+
+// === COMPARE TAB ===
+function renderCompare() {
+  const el = document.getElementById('compareContent');
+  const events = (clientData.events || []).slice().sort((a,b) => (a.startTime||0) - (b.startTime||0));
+  if (events.length < 2) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:2.5rem;margin-bottom:10px">📊</div>נדרשים לפחות 2 אירועים להשוואה</div>';
+    return;
+  }
+
+  // Filters
+  const years = [...new Set(events.map(e => e.date ? e.date.split('-')[0] : ''))].filter(Boolean).sort();
+  const locations = [...new Set(events.map(e => e.eventAddress || '').filter(Boolean))];
+
+  let html = '<div class="filter-row">';
+  html += `<button class="filter-btn ${compareFilter==='all'?'active':''}" onclick="compareFilter='all';renderCompare()">הכל</button>`;
+  years.forEach(y => { html += `<button class="filter-btn ${compareFilter===y?'active':''}" onclick="compareFilter='${y}';renderCompare()">${y}</button>`; });
+  locations.forEach(loc => { html += `<button class="filter-btn ${compareFilter===loc?'active':''}" onclick="compareFilter='${loc}';renderCompare()">${esc(loc)}</button>`; });
+  html += '</div>';
+
+  // Filter events
+  let filtered = events;
+  if (compareFilter !== 'all') {
+    filtered = events.filter(e => {
+      if (e.date && e.date.startsWith(compareFilter)) return true;
+      if (e.eventAddress === compareFilter) return true;
+      return false;
+    });
+    if (filtered.length === 0) filtered = events;
+  }
+
+  // Bar chart comparison
+  const maxGuests = Math.max(...filtered.map(e => e.totalGuests || 0), 1);
+  html += `<div class="section"><div class="section-title">השוואת ביקורים</div>
+    <div class="chart-card"><div class="bar-chart" style="height:140px">`;
+  filtered.forEach(ev => {
+    const v = ev.totalGuests || 0;
+    const hPct = (v / maxGuests) * 100;
+    const name = (ev.eventName || ev.clientName || '').substring(0, 12);
+    html += `<div class="bar-col">
+      <div class="bar" style="height:${hPct}%;background:linear-gradient(180deg,var(--green),var(--blue))">
+        <div class="bar-val" style="color:var(--green)">${v}</div>
+      </div>
+      <div class="bar-label">${esc(name)}</div>
+      <div class="bar-label">${ev.date ? ev.date.substring(5) : ''}</div>
+    </div>`;
+  });
+  html += '</div></div></div>';
+
+  // Arrival Rate comparison
+  const maxRate = 100;
+  html += `<div class="section"><div class="section-title">השוואת אחוזי הגעה</div>
+    <div class="chart-card"><div class="bar-chart" style="height:120px">`;
+  filtered.forEach(ev => {
+    const rate = ev.arrivalRate || 0;
+    const color = rate >= 70 ? 'var(--green)' : rate >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const name = (ev.eventName || ev.clientName || '').substring(0, 12);
+    html += `<div class="bar-col">
+      <div class="bar" style="height:${rate}%;background:${color}">
+        <div class="bar-val" style="color:${color}">${rate}%</div>
+      </div>
+      <div class="bar-label">${esc(name)}</div>
+    </div>`;
+  });
+  html += '</div></div></div>';
+
+  // Comparison Table
+  html += `<div class="section"><div class="section-title">טבלת השוואה מפורטת</div>
+    <div class="chart-card" style="overflow-x:auto;padding:8px">
+      <table class="cmp-table">
+        <tr><th>אירוע</th><th>תאריך</th><th>נרשמו</th><th>הגיעו</th><th>% הגעה</th><th>מזדמנים</th><th>סה"כ</th></tr>`;
+  filtered.forEach(ev => {
+    const rate = ev.arrivalRate || 0;
+    const rateColor = rate >= 70 ? 'var(--green)' : rate >= 50 ? 'var(--yellow)' : 'var(--red)';
+    html += `<tr>
+      <td style="font-weight:600;white-space:nowrap">${esc((ev.eventName||ev.clientName||'').substring(0,20))}</td>
+      <td style="color:var(--muted);direction:ltr;font-size:.7rem">${ev.date||''}</td>
+      <td style="color:var(--blue);font-weight:700">${ev.totalRegs||0}</td>
+      <td style="color:var(--green);font-weight:700">${ev.arrivedRegs||0}</td>
+      <td><span class="rate-bar"><span class="rate-track"><span class="rate-fill" style="width:${rate}%;background:${rateColor}"></span></span><span style="font-weight:700;color:${rateColor}">${rate}%</span></span></td>
+      <td style="color:var(--orange)">${ev.walkins||0}</td>
+      <td style="font-weight:800">${ev.totalGuests||0}</td>
+    </tr>`;
+  });
+  html += '</table></div></div>';
+
+  el.innerHTML = html;
+}
+
+// === INSIGHTS TAB ===
+function renderInsights() {
+  const el = document.getElementById('insightsContent');
+  const events = clientData.events || [];
+  const insights = clientData.insights || {};
+
+  if (events.length === 0) {
+    el.innerHTML = '<div class="loading">אין מספיק נתונים לתובנות</div>';
+    return;
+  }
+
+  let html = '';
+
+  // Summary KPIs
+  html += `<div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi" style="--kpi-color:var(--purple)"><div class="kpi-icon">🎪</div><div class="kpi-val">${events.length}</div><div class="kpi-label">סה"כ אירועים</div></div>
+    <div class="kpi" style="--kpi-color:var(--green)"><div class="kpi-icon">👥</div><div class="kpi-val">${insights.totalGuestsAllTime || events.reduce((s,e)=>s+(e.totalGuests||0),0)}</div><div class="kpi-label">סה"כ ביקרו</div></div>
+    <div class="kpi" style="--kpi-color:var(--blue)"><div class="kpi-icon">📊</div><div class="kpi-val">${insights.avgArrivalRateOverall || 0}%</div><div class="kpi-label">ממוצע הגעה</div></div>
+    <div class="kpi" style="--kpi-color:var(--cyan)"><div class="kpi-icon">⏱</div><div class="kpi-val">${insights.avgStayAllEvents || 0}<span style="font-size:.7rem">דק'</span></div><div class="kpi-label">שהייה ממוצעת</div></div>
+  </div>`;
+
+  // Growth trend
+  if (insights.growthTrend !== undefined && events.length >= 2) {
+    const trend = insights.growthTrend;
+    const isUp = trend >= 0;
+    html += `<div class="insight-card">
+      <div class="insight-icon">${isUp ? '📈' : '📉'}</div>
+      <div class="insight-text">
+        <div class="insight-title">מגמת צמיחה</div>
+        <div class="insight-sub">
+          ${isUp ? `עלייה של ${trend}% במספר המבקרים מהאירוע הראשון לאחרון` : `ירידה של ${Math.abs(trend)}% — שווה לבדוק מה השתנה`}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Best arrival rate
+  if (insights.bestArrivalRate) {
+    html += `<div class="insight-card">
+      <div class="insight-icon">🏆</div>
+      <div class="insight-text">
+        <div class="insight-title">שיא אחוז הגעה</div>
+        <div class="insight-sub">
+          האירוע <strong>${esc(insights.bestArrivalRate.eventName || '')}</strong> השיג שיא של <strong style="color:var(--green)">${insights.bestArrivalRate.rate}%</strong> הגעה מתוך הנרשמים
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Best slot position
+  if (insights.bestSlotPosition !== undefined && insights.bestSlotPosition >= 0) {
+    html += `<div class="insight-card">
+      <div class="insight-icon">⏰</div>
+      <div class="insight-text">
+        <div class="insight-title">הסבב הכי פופולרי</div>
+        <div class="insight-sub">
+          סבב ${insights.bestSlotPosition + 1} הוא בעל אחוז ההגעה הגבוה ביותר בממוצע — שווה לתכנן את עיקר הפעילות סביבו
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Walkin recommendation
+  const totalWalkins = events.reduce((s,e)=>s+(e.walkins||0),0);
+  const totalGuests = events.reduce((s,e)=>s+(e.totalGuests||0),0);
+  if (totalGuests > 0) {
+    const walkinPct = Math.round(totalWalkins / totalGuests * 100);
+    html += `<div class="insight-card">
+      <div class="insight-icon">🚶</div>
+      <div class="insight-text">
+        <div class="insight-title">מזדמנים: ${walkinPct}% מהמבקרים</div>
+        <div class="insight-sub">
+          ${walkinPct > 30 ? 'אחוז גבוה של מזדמנים — שקלו להגביר את הפרסום המקדים כדי לשפר את התכנון' : 'רוב המבקרים נרשמים מראש — תכנון מצוין!'}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // No-show recommendation
+  const avgRate = insights.avgArrivalRateOverall || 0;
+  if (avgRate > 0 && avgRate < 70) {
+    html += `<div class="insight-card">
+      <div class="insight-icon">💡</div>
+      <div class="insight-text">
+        <div class="insight-title">שיפור אחוז הגעה</div>
+        <div class="insight-sub">
+          ממוצע ההגעה שלכם <strong style="color:var(--yellow)">${avgRate}%</strong>. שלחו תזכורת וואצאפ יום לפני האירוע כדי לשפר את אחוז ההגעה.
+        </div>
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Auto-refresh live tab every 30 seconds
+setInterval(() => {
+  if (!clientData) return;
+  const activePanel = document.querySelector('.tab-panel.active');
+  if (activePanel && activePanel.id === 'tab-live') {
+    // Re-fetch active event data
+    const ev = (clientData.events || [])[0];
+    if (ev && ev.clientToken) {
+      fetch('/api/client/' + ev.clientToken).then(r => r.json()).then(data => {
+        // Update the first event's live data
+        const idx = clientData.events.findIndex(e => e.id === data.id);
+        if (idx >= 0) Object.assign(clientData.events[idx], data);
+        renderLive();
+      }).catch(() => {});
+    }
+  }
+}, 30000);
+</script>
+</body>
+</html>

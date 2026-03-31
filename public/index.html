@@ -1798,7 +1798,10 @@ function buildClientMsg(data, ev, base) {
   }
   msg += `\n━━━━━━━━━━━━━━━━\n`;
   msg += `\n🔗 *קישורים:*\n`;
-  if (clientUrl) msg += `📊 צפייה בלייב: ${clientUrl}\n`;
+  if (clientUrl) {
+    const clientDashUrl = `${base.replace(/\/[^/]*$/, '')}/client.html?token=${data.clientToken}`;
+    msg += `📊 לוח בקרה ללקוח: ${clientDashUrl}\n`;
+  }
   msg += `📝 הרשמה למשתתפים: ${regUrl}\n`;
   msg += `\n━━━━━━━━━━━━━━━━\n`;
   msg += `🌈 *חברים של טופי בע״מ*`;
@@ -2828,7 +2831,7 @@ function previewView(type) {
       url = base + '?event=' + activeEventId + '#dashboard';
       break;
     case 'client':
-      url = S.clientToken ? base + '?client=' + S.clientToken : '';
+      url = S.clientToken ? window.location.origin + '/client.html?token=' + S.clientToken : '';
       if (!url) { showError('אין טוקן לקוח - שמרו את האירוע קודם'); return; }
       break;
     case 'walkin':

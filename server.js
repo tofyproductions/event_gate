@@ -175,6 +175,76 @@ app.get('/api/events', requireAdmin, (req, res) => {
   res.json({ events: list, adminToken: ADMIN_TOKEN });
 });
 
+// SSE Public Endpoint — real-time event state stream
+app.get('/api/events/public', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  function sendState() {
+    const now = Date.now();
+    // Find the first active event
+    const activeEvent = Object.values(db.events || {}).find(ev => {
+      if (!ev.configured || !ev.slots || ev.slots.length === 0) return false;
+      const windowStart = ev.slots[0].startTime - 30 * 60000;
+      const windowEnd = ev.slots[ev.slots.length - 1].endTime + 30 * 60000;
+      return now >= windowStart && now <= windowEnd;
+    });
+
+    if (!activeEvent) {
+      res.write(`data: ${JSON.stringify({ configured: false })}\n\n`);
+      return;
+    }
+
+    const guests = Object.values(activeEvent.guests || {});
+    const preRegs = Object.values(activeEvent.preRegs || {});
+    const currentCount = activeCount(activeEvent);
+    const totalGuests = guests.reduce((sum, g) => sum + (g.groupSize || 1), 0);
+    const totalRegs = preRegs.reduce((sum, r) => sum + (r.participants || 1), 0);
+
+    // Determine current slot index
+    let currentSlotIndex = -1;
+    (activeEvent.slots || []).forEach((s, i) => {
+      if (now >= s.startTime && now <= s.endTime) currentSlotIndex = i;
+    });
+
+    // Slot stats
+    const slotStats = (activeEvent.slots || []).map(s => {
+      const registered = preRegs.filter(r => r.slotIndex === s.index).reduce((sum, r) => sum + (r.participants || 1), 0);
+      return { index: s.index, label: s.label, startTime: s.startTime, endTime: s.endTime, registered };
+    });
+
+    const walkins = guests.filter(g => g.type === 'walkin').reduce((sum, g) => sum + (g.groupSize || 1), 0);
+
+    const state = {
+      configured: true,
+      eventName: activeEvent.eventName,
+      clientName: activeEvent.clientName,
+      date: activeEvent.date,
+      startTime: activeEvent.startTime,
+      eventAddress: activeEvent.eventAddress || '',
+      currentCount,
+      maxCapacity: activeEvent.maxCapacity,
+      currentSlotIndex,
+      totalGuests,
+      totalRegs,
+      walkins,
+      slotStats
+    };
+
+    res.write(`data: ${JSON.stringify(state)}\n\n`);
+  }
+
+  // Send immediately, then every 3 seconds
+  sendState();
+  const interval = setInterval(sendState, 3000);
+
+  req.on('close', () => {
+    clearInterval(interval);
+  });
+});
+
 // Get single event (public — for registration page)
 app.get('/api/events/:id', (req, res) => {
   const ev = db.events[req.params.id];
@@ -222,6 +292,125 @@ app.get('/api/client/:token', (req, res) => {
     totalGuests: Object.values(ev.guests || {}).reduce((sum, g) => sum + (g.groupSize || 1), 0),
     totalRegs: preRegs.reduce((sum, r) => sum + (r.participants || 1), 0),
     pendingRegs: preRegs.filter(r => !r.arrived).reduce((sum, r) => sum + (r.participants || 1), 0),
+  });
+});
+
+// Client analytics — cross-event comparison
+app.get('/api/client/:token/analytics', (req, res) => {
+  const ev = Object.values(db.events).find(e => e.clientToken === req.params.token);
+  if (!ev) return res.status(404).json({ error: 'אירוע לא נמצא' });
+
+  const clientName = ev.clientName;
+  const clientEvents = Object.values(db.events).filter(e => e.clientName === clientName && e.configured);
+
+  const eventsData = clientEvents.map(ce => {
+    const guests = Object.values(ce.guests || {});
+    const preRegs = Object.values(ce.preRegs || {});
+    const totalRegs = preRegs.reduce((sum, r) => sum + (r.participants || 1), 0);
+    const arrivedRegs = preRegs.filter(r => r.arrived).reduce((sum, r) => sum + (r.participants || 1), 0);
+    const pendingRegs = totalRegs - arrivedRegs;
+    const walkins = guests.filter(g => g.type === 'walkin').reduce((sum, g) => sum + (g.groupSize || 1), 0);
+    const totalGuests = guests.reduce((sum, g) => sum + (g.groupSize || 1), 0);
+    const arrivalRate = totalRegs > 0 ? Math.round((arrivedRegs / totalRegs) * 100) : 0;
+
+    // Avg stay in minutes
+    const stayGuests = guests.filter(g => g.checkinTime && g.checkoutTime);
+    const avgStayMinutes = stayGuests.length > 0
+      ? Math.round(stayGuests.reduce((sum, g) => sum + (g.checkoutTime - g.checkinTime), 0) / stayGuests.length / 60000)
+      : 0;
+
+    // Slot breakdown
+    const slots = (ce.slots || []).map(s => {
+      const slotRegs = preRegs.filter(r => r.slotIndex === s.index);
+      const regCount = slotRegs.reduce((sum, r) => sum + (r.participants || 1), 0);
+      const arrivedCount = slotRegs.filter(r => r.arrived).reduce((sum, r) => sum + (r.participants || 1), 0);
+      return { label: s.label, regCount, arrivedCount, rate: regCount > 0 ? Math.round((arrivedCount / regCount) * 100) : 0 };
+    });
+
+    // Hourly flow — group checkins by hour
+    const hourlyFlow = {};
+    guests.forEach(g => {
+      if (g.checkinTime) {
+        const h = new Date(g.checkinTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' }).replace(/:\d{2}$/, ':00');
+        hourlyFlow[h] = (hourlyFlow[h] || 0) + (g.groupSize || 1);
+      }
+    });
+
+    // Peak concurrent — simulate guest flow
+    let peakConcurrent = 0;
+    const timestamps = [];
+    guests.forEach(g => {
+      if (g.checkinTime) timestamps.push({ time: g.checkinTime, delta: g.groupSize || 1 });
+      if (g.checkoutTime) timestamps.push({ time: g.checkoutTime, delta: -(g.groupSize || 1) });
+    });
+    timestamps.sort((a, b) => a.time - b.time);
+    let concurrent = 0;
+    timestamps.forEach(t => {
+      concurrent += t.delta;
+      if (concurrent > peakConcurrent) peakConcurrent = concurrent;
+    });
+
+    // Ratings
+    const ratings = ce.ratings || [];
+    const avgRating = ratings.length > 0 ? Math.round(ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length * 10) / 10 : null;
+
+    return {
+      id: ce.id, eventName: ce.eventName, date: ce.date, eventAddress: ce.eventAddress,
+      startTime: ce.startTime, numSlots: ce.numSlots, maxCapacity: ce.maxCapacity,
+      totalRegs, arrivedRegs, pendingRegs, walkins, totalGuests,
+      arrivalRate, avgStayMinutes, slots, hourlyFlow, peakConcurrent,
+      avgRating, ratingCount: ratings.length
+    };
+  });
+
+  const totalGuestsAllTime = eventsData.reduce((sum, e) => sum + e.totalGuests, 0);
+  const totalRegsAll = eventsData.reduce((sum, e) => sum + e.totalRegs, 0);
+  const ratedEvents = eventsData.filter(e => e.arrivalRate > 0);
+  const avgArrivalRateOverall = ratedEvents.length > 0
+    ? Math.round(ratedEvents.reduce((sum, e) => sum + e.arrivalRate, 0) / ratedEvents.length)
+    : 0;
+  const bestArrival = ratedEvents.length > 0
+    ? ratedEvents.reduce((best, e) => e.arrivalRate > best.arrivalRate ? e : best, ratedEvents[0])
+    : null;
+
+  // Best slot position — which slot index typically has highest arrival rate
+  const slotRates = {};
+  const slotCounts = {};
+  eventsData.forEach(e => {
+    e.slots.forEach((s, i) => {
+      slotRates[i] = (slotRates[i] || 0) + s.rate;
+      slotCounts[i] = (slotCounts[i] || 0) + 1;
+    });
+  });
+  let bestSlotPosition = 0;
+  let bestSlotAvg = 0;
+  for (const idx in slotRates) {
+    const avg = slotRates[idx] / slotCounts[idx];
+    if (avg > bestSlotAvg) { bestSlotAvg = avg; bestSlotPosition = parseInt(idx); }
+  }
+
+  const stayEvents = eventsData.filter(e => e.avgStayMinutes > 0);
+  const avgStayAllEvents = stayEvents.length > 0
+    ? Math.round(stayEvents.reduce((sum, e) => sum + e.avgStayMinutes, 0) / stayEvents.length)
+    : 0;
+
+  // Growth trend — percent change from first to last event total guests
+  const sorted = [...eventsData].sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+  const firstGuests = sorted.length > 0 ? sorted[0].totalGuests : 0;
+  const lastGuests = sorted.length > 0 ? sorted[sorted.length - 1].totalGuests : 0;
+  const growthTrend = firstGuests > 0 ? Math.round(((lastGuests - firstGuests) / firstGuests) * 100) : 0;
+
+  res.json({
+    client: { name: clientName, totalEvents: eventsData.length, totalGuests: totalGuestsAllTime, totalRegs: totalRegsAll },
+    events: eventsData,
+    insights: {
+      bestArrivalRate: bestArrival ? { eventName: bestArrival.eventName, rate: bestArrival.arrivalRate } : null,
+      avgArrivalRateOverall,
+      totalGuestsAllTime,
+      bestSlotPosition,
+      avgStayAllEvents,
+      growthTrend
+    }
   });
 });
 
