@@ -392,6 +392,9 @@
   <div class="section-title">
     אורחים נוכחים <span class="badge badge-green" id="activeBadge">0</span>
   </div>
+  <div style="padding:0 16px 8px">
+    <input type="text" id="adminGuestSearch" placeholder="🔍 חפש אורח לפי שם או טלפון..." oninput="filterAdminGuests()" style="width:100%;padding:10px 14px;background:var(--bg);border:2px solid #475569;border-radius:12px;color:var(--text);font-size:.85rem;outline:none;font-family:inherit" onfocus="this.style.borderColor='#60a5fa'" onblur="this.style.borderColor='#475569'" />
+  </div>
   <div class="guest-list" id="activeList">
     <div class="empty-msg">אין אורחים כרגע</div>
   </div>
@@ -754,6 +757,14 @@
 
     function toggleSection(id) {
       document.getElementById(id).classList.toggle('show');
+    }
+
+    function filterAdminGuests() {
+      const query = (document.getElementById('adminGuestSearch').value || '').trim().toLowerCase();
+      document.querySelectorAll('#activeList .guest-card, #regFullList .guest-card').forEach(card => {
+        const text = card.textContent.toLowerCase();
+        card.style.display = text.includes(query) ? '' : 'none';
+      });
     }
 
     // CSV injection protection

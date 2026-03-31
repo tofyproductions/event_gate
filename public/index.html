@@ -202,17 +202,42 @@
     .slot-time{direction:ltr;unicode-bidi:embed}
     .error-toast{
       position:fixed;top:70px;left:16px;right:16px;z-index:200;
-      background:rgba(239,68,68,.95);color:white;padding:12px 16px;
+      background:rgba(239,68,68,.95);color:white;padding:14px 40px 14px 16px;
       border-radius:12px;text-align:center;font-weight:600;font-size:.9rem;
-      display:none;animation:slideDown .3s;
+      display:none;animation:slideDown .3s;cursor:pointer;
+      box-shadow:0 4px 20px rgba(239,68,68,.3);backdrop-filter:blur(8px);
     }
     .success-toast{
       position:fixed;top:70px;left:16px;right:16px;z-index:200;
-      background:rgba(34,197,94,.95);color:white;padding:12px 16px;
+      background:rgba(34,197,94,.95);color:white;padding:14px 40px 14px 16px;
       border-radius:12px;text-align:center;font-weight:600;font-size:.9rem;
-      display:none;animation:slideDown .3s;
+      display:none;animation:slideDown .3s;cursor:pointer;
+      box-shadow:0 4px 20px rgba(34,197,94,.3);backdrop-filter:blur(8px);
+    }
+    .error-toast::after,.success-toast::after{
+      content:'✕';position:absolute;left:14px;top:50%;transform:translateY(-50%);
+      font-size:.75rem;opacity:.7;
     }
     @keyframes slideDown{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes fadeOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-10px)}}
+    /* Loading spinner on buttons */
+    .btn-loading{pointer-events:none;opacity:.7;position:relative}
+    .btn-loading::after{
+      content:'';display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.3);
+      border-top-color:white;border-radius:50%;animation:spin .6s linear infinite;
+      margin-right:8px;vertical-align:middle;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    /* Search input for dashboard */
+    .search-input{
+      width:100%;padding:10px 14px 10px 36px;background:var(--bg);
+      border:2px solid var(--input-border);border-radius:12px;
+      color:var(--text);font-size:.85rem;outline:none;transition:border-color .2s;
+      font-family:inherit;
+    }
+    .search-input:focus{border-color:#60a5fa}
+    .search-wrap{position:relative;margin-bottom:10px}
+    .search-wrap::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.85rem;pointer-events:none}
 
     /* ===== SETUP PAGE ===== */
     .preview-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px}
@@ -322,12 +347,15 @@
     .slot-option{
       display:flex;justify-content:space-between;align-items:center;
       background:var(--card);border:2px solid var(--border);border-radius:12px;
-      padding:14px 16px;cursor:pointer;transition:border-color .2s;margin-bottom:8px;
+      padding:14px 16px;cursor:pointer;transition:all .2s;margin-bottom:8px;
       -webkit-tap-highlight-color:transparent;
     }
-    .slot-option:hover{border-color:var(--input-border)}
-    .slot-option.selected{border-color:var(--blue);background:rgba(59,130,246,.06)}
+    .slot-option:hover{border-color:var(--input-border);transform:translateX(-2px)}
+    .slot-option:active{transform:scale(.98)}
+    .slot-option.selected{border-color:var(--blue);background:rgba(59,130,246,.08);box-shadow:0 0 0 3px rgba(59,130,246,.15);transform:translateX(-4px)}
+    .slot-option.selected .slot-time{color:var(--blue)}
     .slot-option.full{opacity:.4;cursor:not-allowed}
+    .slot-option.full-waitlist{opacity:.85;border-color:rgba(249,115,22,.3);cursor:pointer}
     .slot-time{font-weight:600;font-size:.95rem;direction:ltr}
     .slot-info{font-size:.75rem;color:var(--muted)}
     .slot-avail{font-size:.7rem;padding:3px 8px;border-radius:8px}
@@ -634,11 +662,12 @@
       </div>
       <div class="form-group">
         <label>שם מלא</label>
-        <input type="text" id="regName" placeholder="הכניסו שם" autocomplete="name" />
+        <input type="text" id="regName" placeholder="הכניסו שם" autocomplete="name" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('regPhone').focus()}" />
       </div>
       <div class="form-group">
         <label>טלפון <span style="font-weight:400;color:var(--red);font-size:.8rem">*חובה</span></label>
-        <input type="tel" id="regPhone" placeholder="050-1234567 (חובה)" required autocomplete="tel" required />
+        <input type="tel" id="regPhone" placeholder="050-1234567 (חובה)" required autocomplete="tel" style="direction:ltr;text-align:right" oninput="validatePhoneHint(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('regSlotGrid').scrollIntoView({behavior:'smooth'})}" />
+        <div id="regPhoneHint" class="hint" style="transition:color .2s"></div>
       </div>
       <div class="form-group">
         <label>כמות משתתפים</label>
@@ -755,9 +784,9 @@
       <div class="card">
         <div class="form-group">
           <label>קוד הרשמה או מספר טלפון</label>
-          <input type="text" id="ciCode" class="code-input" placeholder="ABCD1234 או 050-1234567" autocomplete="off" />
+          <input type="text" id="ciCode" class="code-input" placeholder="ABCD1234 או 050-1234567" autocomplete="off" style="font-size:1.3rem;letter-spacing:2px;text-align:center;text-transform:uppercase;font-weight:700" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')doCodeCheckin()" />
         </div>
-        <button class="btn-primary blue" onclick="doCodeCheckin()">כניסה</button>
+        <button class="btn-primary blue" id="btnCodeCheckin" onclick="doCodeCheckin()">כניסה</button>
       </div>
     </div>
 
@@ -770,7 +799,8 @@
         </div>
         <div class="form-group">
           <label>מספר טלפון</label>
-          <input type="tel" id="ciPhone" placeholder="050-1234567" autocomplete="tel" style="direction:ltr;text-align:right" />
+          <input type="tel" id="ciPhone" placeholder="050-1234567" autocomplete="tel" style="direction:ltr;text-align:right" oninput="validateWalkinPhoneHint(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('walkinTerms').focus()}" />
+          <div id="ciPhoneHint" class="hint" style="transition:color .2s"></div>
         </div>
         <div class="form-group">
           <label>כמות משתתפים</label>
@@ -781,7 +811,7 @@
           </div>
         </div>
         <label class="terms-check"><input type="checkbox" id="walkinTerms" /><span>קראתי ואני מסכים/ה ל<a href="javascript:toggleTerms()" style="color:var(--blue);text-decoration:underline">תקנון</a></span></label>
-        <button class="btn-primary green" onclick="doWalkinCheckin()">כניסה לאירוע</button>
+        <button class="btn-primary green" id="btnWalkinCheckin" onclick="doWalkinCheckin()">כניסה לאירוע</button>
       </div>
     </div>
 
@@ -1024,6 +1054,7 @@
   <div id="dbSlots"></div>
 
   <div class="section-title">אורחים נוכחים <span class="badge badge-green" id="dbActiveBadge">0</span></div>
+  <div class="search-wrap"><input type="text" class="search-input" id="dbGuestSearch" placeholder="חפש אורח לפי שם או טלפון..." oninput="filterDashboardGuests()" /></div>
   <div id="dbActiveList"></div>
 
   <div class="section-title">נרשמים מראש <span class="badge badge-blue" id="dbRegBadge">0</span></div>
@@ -1522,18 +1553,32 @@ function csvSafe(str) {
 // ============================================================
 //  TOAST
 // ============================================================
+let _errorTimer = null, _successTimer = null;
 function showError(msg) {
   const el = document.getElementById('errorToast');
   el.textContent = msg;
   el.style.display = 'block';
-  setTimeout(() => el.style.display = 'none', 3500);
+  el.style.animation = 'slideDown .3s';
+  if (_errorTimer) clearTimeout(_errorTimer);
+  _errorTimer = setTimeout(() => { el.style.animation = 'fadeOut .3s forwards'; setTimeout(() => el.style.display = 'none', 300); }, 5000);
+  el.onclick = () => { clearTimeout(_errorTimer); el.style.display = 'none'; };
+  if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
 }
 
 function showSuccess(msg) {
   const el = document.getElementById('successToast');
   el.textContent = msg;
   el.style.display = 'block';
-  setTimeout(() => el.style.display = 'none', 3000);
+  el.style.animation = 'slideDown .3s';
+  if (_successTimer) clearTimeout(_successTimer);
+  _successTimer = setTimeout(() => { el.style.animation = 'fadeOut .3s forwards'; setTimeout(() => el.style.display = 'none', 300); }, 3500);
+  el.onclick = () => { clearTimeout(_successTimer); el.style.display = 'none'; };
+}
+
+function btnLoading(btn, loading) {
+  if (!btn) return;
+  if (loading) { btn._origText = btn.textContent; btn.classList.add('btn-loading'); btn.disabled = true; }
+  else { btn.classList.remove('btn-loading'); btn.disabled = false; if (btn._origText) btn.textContent = btn._origText; }
 }
 
 // ============================================================
@@ -2170,6 +2215,18 @@ function changeRegCount(delta) {
   el.value = val;
 }
 
+function _phoneHint(input, hintId) {
+  const hint = document.getElementById(hintId);
+  if (!hint) return;
+  const v = input.value.replace(/[^0-9]/g, '');
+  if (v.length === 0) { hint.textContent = ''; input.style.borderColor = ''; }
+  else if (v.length < 10) { hint.textContent = `${10 - v.length} ספרות נוספות נדרשות`; hint.style.color = 'var(--yellow)'; input.style.borderColor = 'var(--yellow)'; }
+  else if (!v.match(/^05\d{8}$/)) { hint.textContent = 'מספר לא תקין — צריך להתחיל ב-05'; hint.style.color = 'var(--red)'; input.style.borderColor = 'var(--red)'; }
+  else { hint.textContent = '✓ מספר תקין'; hint.style.color = 'var(--green)'; input.style.borderColor = 'var(--green)'; }
+}
+function validatePhoneHint(input) { _phoneHint(input, 'regPhoneHint'); }
+function validateWalkinPhoneHint(input) { _phoneHint(input, 'ciPhoneHint'); }
+
 function doRegister() {
   if (!document.getElementById('regTerms').checked) { showError('יש לאשר את תקנון הפעילות'); return; }
   const name = document.getElementById('regName').value.trim();
@@ -2182,6 +2239,8 @@ function doRegister() {
   const participants = Math.max(1, Math.min(4, parseInt(document.getElementById('regParticipants').value) || 1));
 
   // Register via server API
+  const regBtn = document.querySelector('#regFormSection .btn-primary');
+  btnLoading(regBtn, true);
   (async () => {
     try {
       const res = await fetch('/api/events/' + activeEventId + '/register', {
@@ -2189,7 +2248,7 @@ function doRegister() {
         body: JSON.stringify({ name: name.slice(0, 100), phone: phone.slice(0, 20), slotIndex: selectedRegSlot, participants })
       });
       const data = await res.json();
-      if (!res.ok) { showError(data.error || 'שגיאה ברישום'); return; }
+      if (!res.ok) { showError(data.error || 'שגיאה ברישום'); btnLoading(regBtn, false); return; }
 
       const code = data.code;
       const slot = S.slots[selectedRegSlot];
@@ -2234,6 +2293,8 @@ function doRegister() {
     } catch(e) {
       showError('שגיאת חיבור — נסו שוב');
       console.error('Registration error:', e);
+    } finally {
+      btnLoading(regBtn, false);
     }
   })();
 }
@@ -3467,6 +3528,28 @@ async function openGuestProfiles() {
   } catch(e) {
     showError('שגיאה בטעינת פילוח: ' + e.message);
   }
+}
+
+function filterDashboardGuests() {
+  const query = (document.getElementById('dbGuestSearch').value || '').trim().toLowerCase();
+  // Filter active guests
+  document.querySelectorAll('#dbActiveList .guest-card').forEach(card => {
+    const name = (card.querySelector('.guest-name')?.textContent || '').toLowerCase();
+    const sub = (card.querySelector('.guest-sub')?.textContent || '').toLowerCase();
+    card.style.display = (name.includes(query) || sub.includes(query)) ? '' : 'none';
+  });
+  // Filter pre-reg list
+  document.querySelectorAll('#dbRegList .guest-card').forEach(card => {
+    const name = (card.querySelector('.guest-name')?.textContent || '').toLowerCase();
+    const sub = (card.querySelector('.guest-sub')?.textContent || '').toLowerCase();
+    card.style.display = (name.includes(query) || sub.includes(query)) ? '' : 'none';
+  });
+  // Filter waitlist
+  document.querySelectorAll('#dbWaitlistList .guest-card').forEach(card => {
+    const name = (card.querySelector('.guest-name')?.textContent || '').toLowerCase();
+    const sub = (card.querySelector('.guest-sub')?.textContent || '').toLowerCase();
+    card.style.display = (name.includes(query) || sub.includes(query)) ? '' : 'none';
+  });
 }
 
 function exportCSV() {

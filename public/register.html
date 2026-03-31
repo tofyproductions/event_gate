@@ -456,7 +456,10 @@
       const el = document.getElementById('errorMsg');
       el.textContent = msg;
       el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 4000);
+      if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.classList.remove('show'), 6000);
+      el.onclick = () => { clearTimeout(el._timer); el.classList.remove('show'); };
     }
 
     document.getElementById('nameInput').addEventListener('keydown', (e) => {
