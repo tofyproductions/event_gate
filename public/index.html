@@ -401,13 +401,55 @@
 
     /* ===== HOME PAGE ===== */
     .event-card{
-      background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;
-      border-right:4px solid var(--blue);
+      background:var(--card);border-radius:16px;padding:0;margin-bottom:14px;
+      border:1px solid var(--border);overflow:hidden;
+      transition:transform .15s,box-shadow .15s;
     }
-    .event-card .ec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-    .event-card .ec-name{font-weight:700;font-size:1rem}
+    .event-card:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+    .ec-top{padding:16px 16px 12px;position:relative;overflow:hidden}
+    .ec-top::before{
+      content:'';position:absolute;top:0;left:0;right:0;height:3px;
+      background:linear-gradient(90deg,var(--ec-accent,var(--blue)),var(--purple));
+    }
+    .event-card .ec-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+    .event-card .ec-name{font-weight:800;font-size:1.05rem;line-height:1.3}
     .event-card .ec-date{font-size:.8rem;color:var(--muted)}
-    .event-card .ec-stats{display:flex;gap:12px;font-size:.75rem;color:var(--muted);margin-bottom:10px}
+    .ec-meta{
+      display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:.73rem;color:var(--muted);
+      padding:8px 10px;background:rgba(15,23,42,.5);border-radius:10px;margin-bottom:10px;
+    }
+    .ec-kpi-row{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;
+    }
+    .ec-kpi{
+      text-align:center;padding:8px 4px;border-radius:10px;
+      background:var(--bg);border:1px solid var(--border);
+    }
+    .ec-kpi-val{font-size:1.1rem;font-weight:800;line-height:1}
+    .ec-kpi-lbl{font-size:.55rem;color:var(--muted);margin-top:2px}
+    .ec-slot-grid{
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:5px;margin-bottom:10px;
+    }
+    .ec-slot{
+      background:var(--bg);border-radius:10px;padding:8px;font-size:.65rem;
+      border:1px solid var(--border);position:relative;overflow:hidden;transition:border-color .2s;
+    }
+    .ec-slot.slot-active{border-color:var(--green);box-shadow:0 0 10px rgba(34,197,94,.1)}
+    .ec-slot-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+    .ec-slot-bar{height:3px;background:var(--card);border-radius:2px;overflow:hidden;margin-bottom:3px}
+    .ec-slot-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+    .ec-wl-badge{
+      display:inline-flex;align-items:center;gap:3px;
+      font-size:.55rem;padding:1px 5px;border-radius:4px;
+      background:rgba(249,115,22,.1);color:var(--orange);font-weight:600;
+    }
+    .ec-wl-total{
+      display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;
+      background:linear-gradient(135deg,rgba(249,115,22,.06),rgba(239,68,68,.04));
+      border:1px solid rgba(249,115,22,.15);font-size:.75rem;margin-bottom:10px;
+    }
+    .ec-bottom{padding:0 16px 14px}
+    .event-card .ec-stats{display:flex;gap:10px;font-size:.73rem;color:var(--muted);margin-bottom:10px;flex-wrap:wrap}
     .event-card .ec-stats span{display:flex;align-items:center;gap:4px}
     .event-card .ec-actions{display:flex;gap:6px;flex-wrap:wrap}
 
@@ -1639,58 +1681,100 @@ function renderHomeList(el, reg) {
     const ac = Object.values(data.guests).filter(g => !g.checkoutTime).reduce((sum, g) => sum + (g.groupSize || 1), 0);
     const totalGuests = Object.values(data.guests).reduce((sum, g) => sum + (g.groupSize || 1), 0);
     const totalRegs = Object.values(data.preRegs).reduce((sum, r) => sum + (r.participants || 1), 0);
+    const arrivedRegs = Object.values(data.preRegs).filter(r => r.arrived).reduce((sum, r) => sum + (r.participants || 1), 0);
+    const walkins = Object.values(data.guests).filter(g => g.type === 'walkin').reduce((sum, g) => sum + (g.groupSize || 1), 0);
+    const waitlistAll = Object.values(data.waitlist || {}).filter(w => w.status === 'waiting');
+    const totalWaitlist = waitlistAll.reduce((sum, w) => sum + (w.participants || 1), 0);
     const dateStr = ev.date || '';
     const evTitle = ev.eventName ? `${esc(ev.eventName)} \u2014 ${esc(ev.clientName || '')}` : esc(ev.clientName || '\u05dc\u05dc\u05d0 \u05e9\u05dd');
-    const statusBadge = status === 'today' ? '<span class="badge badge-green" style="font-size:.65rem;margin-right:6px">\ud83d\udfe2 \u05d4\u05d9\u05d5\u05dd</span>' :
-                         status === 'future' ? '<span class="badge badge-blue" style="font-size:.65rem;margin-right:6px">\ud83d\udcc5 \u05e2\u05ea\u05d9\u05d3\u05d9</span>' :
-                         '<span class="badge badge-muted" style="font-size:.65rem;margin-right:6px">\u26ab \u05e2\u05d1\u05e8</span>';
-    const opacity = status === 'past' ? 'opacity:.6' : '';
+    const statusBadge = status === 'today' ? '<span class="badge badge-green" style="font-size:.6rem">\ud83d\udfe2 היום</span>' :
+                         status === 'future' ? '<span class="badge badge-blue" style="font-size:.6rem">\ud83d\udcc5 עתידי</span>' :
+                         '<span class="badge badge-muted" style="font-size:.6rem">\u26ab עבר</span>';
+    const opacity = status === 'past' ? 'opacity:.55' : '';
+    const accentColor = status === 'today' ? 'var(--green)' : status === 'future' ? 'var(--blue)' : 'var(--muted)';
     const evSlots = data.slots || [];
     const timeRange = evSlots.length > 0 ? evSlots[0].label.split(' - ')[0] + ' - ' + evSlots[evSlots.length-1].label.split(' - ')[1] : '';
     const address = data.eventAddress || ev.eventAddress || '';
-    return `<div class="event-card" style="${opacity};cursor:pointer" onclick="if(!event.target.closest('button'))openEvent('${ev.id}')">
-      <div class="ec-header"><div class="ec-name">${evTitle} ${statusBadge}</div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:.75rem;color:var(--muted);margin:6px 0 8px;padding:8px 10px;background:var(--bg);border-radius:10px">
-        <div>📅 <strong style="color:var(--text)">${dateStr}</strong></div>
-        <div>🕐 <strong style="color:var(--text)">${timeRange || '-'}</strong></div>
-        ${ev.contactName ? `<div>👤 ${esc(ev.contactName)}${ev.contactPhone ? ' | ' + esc(ev.contactPhone) : ''}</div>` : '<div></div>'}
-        ${address ? `<div>📍 ${esc(address)}</div>` : '<div></div>'}
-      </div>
-      <div class="ec-stats">
-        ${status === 'today' ? `<span style="color:var(--green)">&#9679; ${ac} נוכחים</span>` : ''}
-        <span>&#128100; ${totalGuests} ביקרו</span>
-        <span>&#128203; ${totalRegs} נרשמו</span>
-        <span>${data.numSlots || 0} סבבים</span>
-      </div>
-      ${evSlots.length > 0 ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px;margin:4px 0 8px">
-        ${evSlots.map((sl, i) => {
-          const slRegs = Object.values(data.preRegs).filter(r => r.slotIndex === i).reduce((s,r) => s + (r.participants||1), 0);
-          const pct = Math.round(slRegs / (data.maxCapacity || 50) * 100);
-          const barColor = pct >= 90 ? 'var(--red)' : pct >= 60 ? 'var(--yellow)' : 'var(--green)';
-          const now = Date.now();
-          const isActive = now >= sl.startTime && now < sl.endTime;
-          const border = isActive ? 'border:1px solid var(--green)' : 'border:1px solid var(--border)';
-          return `<div style="background:var(--bg);border-radius:8px;padding:6px 8px;font-size:.65rem;${border}">
-            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-              <span style="color:var(--muted)">סבב ${i+1}</span>
-              <span style="font-weight:700;color:${barColor}">${slRegs}/${data.maxCapacity||50}</span>
-            </div>
-            <div style="height:3px;background:var(--card);border-radius:2px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px"></div></div>
-            <div style="color:var(--muted);margin-top:2px;direction:ltr;text-align:center">${sl.label}</div>
-          </div>`;
-        }).join('')}
-      </div>` : ''}
+    const maxCap = data.maxCapacity || 50;
+    const arrivalRate = totalRegs > 0 ? Math.round(arrivedRegs / totalRegs * 100) : 0;
+
+    let cardHtml = `<div class="event-card" style="${opacity};cursor:pointer;--ec-accent:${accentColor}" onclick="if(!event.target.closest('button'))openEvent('${ev.id}')">
+      <div class="ec-top">
+        <div class="ec-header">
+          <div class="ec-name">${evTitle}</div>
+          ${statusBadge}
+        </div>
+        <div class="ec-meta">
+          <div>\ud83d\udcc5 <strong style="color:var(--text)">${dateStr}</strong></div>
+          <div>\ud83d\udd50 <strong style="color:var(--text)">${timeRange || '-'}</strong></div>
+          ${ev.contactName ? `<div>\ud83d\udc64 ${esc(ev.contactName)}${ev.contactPhone ? ' | ' + esc(ev.contactPhone) : ''}</div>` : '<div></div>'}
+          ${address ? `<div>\ud83d\udccd ${esc(address)}</div>` : '<div></div>'}
+        </div>
+        <div class="ec-kpi-row">
+          <div class="ec-kpi"><div class="ec-kpi-val" style="color:var(--blue)">${totalRegs}</div><div class="ec-kpi-lbl">נרשמו</div></div>
+          ${status === 'today'
+            ? `<div class="ec-kpi" style="border-color:rgba(34,197,94,.3)"><div class="ec-kpi-val" style="color:var(--green)">${ac}</div><div class="ec-kpi-lbl">\ud83d\udfe2 נוכחים</div></div>`
+            : `<div class="ec-kpi"><div class="ec-kpi-val" style="color:var(--green)">${arrivedRegs}</div><div class="ec-kpi-lbl">הגיעו</div></div>`
+          }
+          <div class="ec-kpi"><div class="ec-kpi-val" style="color:var(--purple)">${totalGuests}</div><div class="ec-kpi-lbl">סה"כ ביקרו</div></div>
+          <div class="ec-kpi" ${totalWaitlist > 0 ? 'style="border-color:rgba(249,115,22,.3);background:rgba(249,115,22,.04)"' : ''}>
+            <div class="ec-kpi-val" style="color:${totalWaitlist > 0 ? 'var(--orange)' : 'var(--muted)'}">${totalWaitlist}</div>
+            <div class="ec-kpi-lbl">\u23f3 המתנה</div>
+          </div>
+        </div>`;
+
+    // Waitlist total banner
+    if (totalWaitlist > 0) {
+      cardHtml += `<div class="ec-wl-total">
+        <span style="font-size:1rem">\u23f3</span>
+        <span style="flex:1"><strong style="color:var(--orange)">${totalWaitlist}</strong> ממתינים ברשימת המתנה</span>
+        <span style="font-size:.65rem;color:var(--muted)">${waitlistAll.length} הרשמות</span>
+      </div>`;
+    }
+
+    // Slot grid
+    if (evSlots.length > 0) {
+      cardHtml += '<div class="ec-slot-grid">';
+      evSlots.forEach((sl, i) => {
+        const slRegs = Object.values(data.preRegs).filter(r => r.slotIndex === i).reduce((s,r) => s + (r.participants||1), 0);
+        const slWait = waitlistAll.filter(w => w.slotIndex === i).reduce((s,w) => s + (w.participants||1), 0);
+        const pct = Math.round(slRegs / maxCap * 100);
+        const barColor = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--yellow)' : 'var(--green)';
+        const now = Date.now();
+        const isActive = now >= sl.startTime && now < sl.endTime;
+        cardHtml += `<div class="ec-slot${isActive ? ' slot-active' : ''}">
+          <div class="ec-slot-head">
+            <span style="color:var(--muted)">סבב ${i+1}${isActive ? ' \ud83d\udfe2' : ''}</span>
+            <span style="font-weight:700;color:${barColor};font-size:.7rem">${slRegs}/${maxCap}</span>
+          </div>
+          <div class="ec-slot-bar"><div class="ec-slot-bar-fill" style="width:${Math.min(pct,100)}%;background:${barColor}"></div></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+            <span style="color:var(--muted);direction:ltr;font-size:.6rem">${sl.label}</span>
+            ${slWait > 0 ? `<span class="ec-wl-badge">\u23f3 ${slWait}</span>` : ''}
+          </div>
+        </div>`;
+      });
+      cardHtml += '</div>';
+    }
+
+    cardHtml += '</div>'; // close ec-top
+
+    // Bottom actions
+    cardHtml += `<div class="ec-bottom">
       <div class="ec-actions">
-        ${status !== 'past' ? `<button class="btn-sm orange" onclick="editEvent('${ev.id}')">&#9998; \u05e2\u05e8\u05d9\u05db\u05d4</button>` : ''}
-        <button class="btn-sm red" onclick="deleteEvent('${ev.id}')">\u05de\u05d7\u05e7</button>
+        ${status !== 'past' ? `<button class="btn-sm orange" onclick="editEvent('${ev.id}')">\u270e עריכה</button>` : ''}
+        <button class="btn-sm red" onclick="deleteEvent('${ev.id}')">מחק</button>
       </div>
-      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-        <button class="btn-sm green" onclick="waQuickClient('${ev.id}')" style="flex:1;padding:8px;font-size:.7rem">&#128172; ללקוח</button>
-        <button class="btn-sm blue" onclick="waQuickStaff('${ev.id}')" style="flex:1;padding:8px;font-size:.7rem">&#128188; לעובד</button>
-        <button class="btn-sm orange" onclick="waQuickQR('${ev.id}')" style="flex:1;padding:8px;font-size:.7rem">&#128248; QR למזדמן</button>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn-sm green" onclick="waQuickClient('${ev.id}')" style="flex:1;padding:8px;font-size:.7rem">\ud83d\udcac ללקוח</button>
+        <button class="btn-sm blue" onclick="waQuickStaff('${ev.id}')" style="flex:1;padding:8px;font-size:.7rem">\ud83d\udcbc לעובד</button>
+        <button class="btn-sm orange" onclick="waQuickQR('${ev.id}')" style="flex:1;padding:8px;font-size:.7rem">\ud83d\udcf8 QR למזדמן</button>
       </div>
-      <button class="btn-primary blue" onclick="openShareModal('${ev.id}')" style="margin-top:8px;padding:10px;font-size:.8rem">&#128279; שיתוף ושיווק</button>
+      <button class="btn-primary blue" onclick="openShareModal('${ev.id}')" style="margin-top:8px;padding:10px;font-size:.8rem">\ud83d\udd17 שיתוף ושיווק</button>
     </div>`;
+
+    cardHtml += '</div>';
+    return cardHtml;
   }
 
   let html = '';
